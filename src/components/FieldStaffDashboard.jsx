@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getReports, updateReportStatus, CATEGORIES, PRIORITIES, STATUSES } from '../mockData';
+import { getReports, updateReportStatus, CATEGORIES, PRIORITIES, STATUSES, getNotifications, markNotificationRead, markAllNotificationsRead } from '../mockData';
 
 export default function FieldStaffDashboard({ user, onLogout }) {
   const [reports, setReports] = useState([]);
@@ -11,9 +11,40 @@ export default function FieldStaffDashboard({ user, onLogout }) {
   const [actionSuccess, setActionSuccess] = useState('');
   const [actionError, setActionError] = useState('');
 
+  // Notification states
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
   useEffect(() => {
     loadReports();
+    loadNotifications();
+
+    const interval = setInterval(() => {
+      loadReports();
+      loadNotifications();
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
+
+  const loadNotifications = () => {
+    setNotifications(getNotifications(user.email));
+  };
+
+  const handleNotificationClick = (notif) => {
+    markNotificationRead(notif.id);
+    loadNotifications();
+    setShowNotifDropdown(false);
+    const all = getReports();
+    const found = all.find(r => r.id === notif.reportId);
+    if (found && found.assignedTo === user.email) {
+      setSelectedReport(found);
+    }
+  };
+
+  const handleMarkAllRead = () => {
+    markAllNotificationsRead(user.email);
+    loadNotifications();
+  };
 
   const loadReports = () => {
     const all = getReports();
@@ -79,7 +110,114 @@ export default function FieldStaffDashboard({ user, onLogout }) {
             <span className="user-role-badge staff">Personal de Campo</span>
           </div>
         </div>
-        <div className="header-actions">
+        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
+          {/* Notification Bell */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+              style={{
+                background: 'var(--bg-main)',
+                border: '1px solid var(--border)',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'all 0.2s'
+              }}
+            >
+              🔔
+              {notifications.filter(n => !n.read).length > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  background: '#ef4444',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '20px',
+                  height: '20px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {notifications.filter(n => !n.read).length}
+                </span>
+              )}
+            </button>
+
+            {showNotifDropdown && (
+              <div className="card" style={{
+                position: 'absolute',
+                top: '50px',
+                right: '0',
+                width: '320px',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                zIndex: 1000,
+                boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  borderBottom: '1px solid var(--border)'
+                }}>
+                  <strong style={{ fontSize: '14px' }}>Mis Notificaciones</strong>
+                  {notifications.filter(n => !n.read).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleMarkAllRead}
+                      style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', cursor: 'pointer', fontWeight: '600' }}
+                    >
+                      Marcar todo leídos
+                    </button>
+                  )}
+                </div>
+                <div>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No tienes notificaciones
+                    </div>
+                  ) : (
+                    notifications.map(n => (
+                      <div
+                        key={n.id}
+                        onClick={() => handleNotificationClick(n)}
+                        style={{
+                          padding: '12px 16px',
+                          borderBottom: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          backgroundColor: !n.read ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' }}>
+                          <strong>{!n.read ? '🔵 Nuevo' : '✓ Leído'}</strong>
+                          <span>{new Date(n.date).toLocaleDateString()}</span>
+                        </div>
+                        <span style={{ fontSize: '13px', fontWeight: !n.read ? '600' : '400' }}>
+                          {n.reportTitle}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
             className="btn btn-secondary"
@@ -148,7 +286,7 @@ export default function FieldStaffDashboard({ user, onLogout }) {
                             className="btn btn-secondary btn-xs"
                             onClick={() => {
                               setSelectedReport(rep);
-                              setNewStatus(rep.status === 'pending' || rep.status === 'assigned' ? 'in_progress' : rep.status);
+                              setNewStatus(rep.status === 'received' || rep.status === 'assigned' ? 'in_progress' : rep.status);
                             }}
                           >
                             🔧 Atender
@@ -196,6 +334,14 @@ export default function FieldStaffDashboard({ user, onLogout }) {
                     <strong>Estado actual:</strong>
                     <span>{getStatusBadge(selectedReport.status)}</span>
                   </div>
+                  {selectedReport.estimatedDate && (
+                    <div className="meta-item">
+                      <strong>📅 Fecha Estimada de Atención:</strong>
+                      <span style={{ color: 'var(--primary)', fontWeight: '600' }}>
+                        {new Date(selectedReport.estimatedDate + 'T12:00:00').toLocaleDateString('es-CR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Evidence photos in Field Staff view */}

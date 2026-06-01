@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getReports, createReport, CATEGORIES, PRIORITIES, STATUSES } from '../mockData';
+import { getReports, createReport, CATEGORIES, PRIORITIES, STATUSES, updateUserProfile, getNotifications, markNotificationRead, markAllNotificationsRead } from '../mockData';
 
 // Fallback data in case the public API has CORS issues or is offline
 const FALLBACK_GEOGRAPHY = {
@@ -41,6 +41,13 @@ export default function CitizenDashboard({ user, onLogout }) {
   const [showForm, setShowForm] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
 
+  // Notifications and Profile states
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(user.notificationsEnabled !== false);
+  const [zoomedImage, setZoomedImage] = useState(null);
+
   // Form states
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -66,7 +73,44 @@ export default function CitizenDashboard({ user, onLogout }) {
 
   useEffect(() => {
     loadReports();
+    loadNotifications();
+
+    // Auto-reload to simulate real-time notification/status checks
+    const interval = setInterval(() => {
+      loadNotifications();
+      loadReports();
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
+
+  const loadNotifications = () => {
+    setNotifications(getNotifications(user.email));
+  };
+
+  const handleNotificationClick = (notif) => {
+    markNotificationRead(notif.id);
+    loadNotifications();
+    setShowNotifDropdown(false);
+    
+    // Find and select the report
+    const all = getReports();
+    const foundReport = all.find(r => r.id === notif.reportId);
+    if (foundReport) {
+      setSelectedReport(foundReport);
+      setShowForm(false);
+    }
+  };
+
+  const handleMarkAllRead = () => {
+    markAllNotificationsRead(user.email);
+    loadNotifications();
+  };
+
+  const handleToggleNotifications = (e) => {
+    const enabled = e.target.checked;
+    setNotificationsEnabled(enabled);
+    updateUserProfile(user.email, { notificationsEnabled: enabled });
+  };
 
   // Fetch Provincias when Form opens
   useEffect(() => {
@@ -100,7 +144,9 @@ export default function CitizenDashboard({ user, onLogout }) {
   const loadReports = () => {
     const all = getReports();
     const filtered = all.filter((r) => r.citizenEmail === user.email);
-    setReports(filtered);
+    // Sort descending by date
+    const sorted = filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    setReports(sorted);
   };
 
   // --- API Geographic Fetching ---
@@ -191,10 +237,19 @@ export default function CitizenDashboard({ user, onLogout }) {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
+    setFormError('');
+    if (uploadedImages.length + files.length > 5) {
+      setFormError('No puede adjuntar más de 5 fotografías en total.');
+      return;
+    }
+
     files.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setUploadedImages((prev) => [...prev, reader.result]);
+        setUploadedImages((prev) => {
+          if (prev.length >= 5) return prev;
+          return [...prev, reader.result];
+        });
       };
       reader.readAsDataURL(file);
     });
@@ -244,10 +299,6 @@ export default function CitizenDashboard({ user, onLogout }) {
       setFormError('El Título del reporte es obligatorio.');
       return;
     }
-    if (!description.trim()) {
-      setFormError('La Descripción del reporte es obligatoria.');
-      return;
-    }
     if (!selectedProvincia || !selectedCanton || !selectedDistrito) {
       setFormError('Debe seleccionar la Provincia, Cantón y Distrito correspondientes.');
       return;
@@ -262,6 +313,10 @@ export default function CitizenDashboard({ user, onLogout }) {
     }
     if (uploadedImages.length === 0) {
       setFormError('Debe adjuntar al menos una foto como evidencia visual del problema.');
+      return;
+    }
+    if (uploadedImages.length > 5) {
+      setFormError('No puede adjuntar más de 5 fotografías como evidencia.');
       return;
     }
 
@@ -281,8 +336,8 @@ export default function CitizenDashboard({ user, onLogout }) {
         citizenEmail: user.email
       };
 
-      createReport(newReportData);
-      setFormSuccess('¡El reporte ha sido enviado exitosamente a la municipalidad!');
+      const createdReport = createReport(newReportData);
+      setFormSuccess(`¡El reporte ha sido enviado exitosamente a la municipalidad! Código de seguimiento: ${createdReport.id}`);
       
       // Reset Form
       setTitle('');
@@ -337,7 +392,160 @@ export default function CitizenDashboard({ user, onLogout }) {
             <span className="user-role-badge citizen">Ciudadano</span>
           </div>
         </div>
-        <div className="header-actions">
+        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
+          {/* Notification Bell */}
+          <div className="notification-bell-container" style={{ position: 'relative' }}>
+            <button
+              type="button"
+              className="btn-icon-badge"
+              onClick={() => {
+                setShowNotifDropdown(!showNotifDropdown);
+                setShowProfileModal(false);
+              }}
+              style={{
+                background: 'var(--bg-main)',
+                border: '1px solid var(--border)',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'all 0.2s'
+              }}
+            >
+              🔔
+              {notifications.filter(n => !n.read).length > 0 && (
+                <span className="bell-badge" style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  background: 'var(--danger, #ef4444)',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '20px',
+                  height: '20px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                }}>
+                  {notifications.filter(n => !n.read).length}
+                </span>
+              )}
+            </button>
+
+            {showNotifDropdown && (
+              <div className="notification-dropdown card" style={{
+                position: 'absolute',
+                top: '50px',
+                right: '0',
+                width: '320px',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                zIndex: 1000,
+                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                animation: 'fade-in 0.2s ease'
+              }}>
+                <div className="dropdown-header" style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  borderBottom: '1px solid var(--border)',
+                  background: 'var(--bg-main)'
+                }}>
+                  <strong style={{ fontSize: '14px' }}>Notificaciones</strong>
+                  {notifications.filter(n => !n.read).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleMarkAllRead}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--primary)',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      Marcar todo leídos
+                    </button>
+                  )}
+                </div>
+                <div className="dropdown-body" style={{ padding: '8px 0' }}>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No tienes notificaciones
+                    </div>
+                  ) : (
+                     notifications.map(n => (
+                      <div
+                        key={n.id}
+                        onClick={() => handleNotificationClick(n)}
+                        className={`notification-item ${!n.read ? 'unread' : ''}`}
+                        style={{
+                          padding: '12px 16px',
+                          borderBottom: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          backgroundColor: !n.read ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                          transition: 'background-color 0.2s',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' }}>
+                          <strong>{n.newStatus.toUpperCase()}</strong>
+                          <span>{new Date(n.date).toLocaleDateString()}</span>
+                        </div>
+                        <span style={{ fontSize: '13px', fontWeight: !n.read ? '600' : '400' }}>
+                          El estado de "{n.reportTitle}" cambió.
+                        </span>
+                        {n.note && (
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            💬 {n.note}
+                          </span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Profile Gear */}
+          <button
+            type="button"
+            className="btn-icon-badge"
+            onClick={() => {
+              setShowProfileModal(!showProfileModal);
+              setShowNotifDropdown(false);
+            }}
+            style={{
+              background: 'var(--bg-main)',
+              border: '1px solid var(--border)',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            ⚙️
+          </button>
+
           <button
             type="button"
             className="btn btn-secondary"
@@ -453,14 +661,13 @@ export default function CitizenDashboard({ user, onLogout }) {
               </div>
 
               <div className="form-group">
-                <label htmlFor="rep-desc">Descripción Detallada <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <label htmlFor="rep-desc">Descripción Detallada <span className="optional-text" style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 'normal', marginLeft: '5px' }}>(Opcional)</span></label>
                 <textarea
                   id="rep-desc"
                   rows="3"
                   placeholder="Explique el problema de manera concisa para ayudar a las autoridades a comprenderlo."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  required
                 ></textarea>
               </div>
 
@@ -702,7 +909,7 @@ export default function CitizenDashboard({ user, onLogout }) {
                     <h4>Evidencias Fotográficas Adjuntas</h4>
                     <div className="detail-images-gallery">
                       {selectedReport.images.map((img, idx) => (
-                        <div key={idx} className="gallery-img-container">
+                        <div key={idx} className="gallery-img-container" style={{ cursor: 'zoom-in' }} onClick={() => setZoomedImage(img)}>
                           <img src={img} alt={`Evidencia ${idx}`} className="gallery-img" />
                         </div>
                       ))}
@@ -751,6 +958,35 @@ export default function CitizenDashboard({ user, onLogout }) {
                   </div>
                 )}
 
+                {selectedReport.status === 'closed' && (
+                  <div className="detail-section closure-evidence card" style={{ padding: '16px', backgroundColor: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', marginBottom: '20px', textAlign: 'left' }}>
+                    <h4 style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0' }}>
+                      🏛️ Evidencia de Cierre Municipal
+                    </h4>
+                    
+                    {selectedReport.closureComment && (
+                      <p style={{ fontSize: '13px', margin: '0 0 12px 0', lineHeight: '1.4' }}>
+                        <strong>Comentario de la Autoridad:</strong> "{selectedReport.closureComment}"
+                      </p>
+                    )}
+                    
+                    {selectedReport.closureImage ? (
+                      <div>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                          📸 Foto de resolución (Haz clic para ampliar):
+                        </span>
+                        <div className="closure-img-container" style={{ width: '120px', height: '90px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border)', cursor: 'zoom-in', transition: 'transform 0.2s' }} onClick={() => setZoomedImage(selectedReport.closureImage)}>
+                          <img src={selectedReport.closureImage} alt="Evidencia de Cierre" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: '12px', color: 'var(--danger)', fontStyle: 'italic', margin: 0 }}>
+                        ⚠️ La autoridad municipal no adjuntó una fotografía de evidencia para el cierre de este caso.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="detail-section">
                   <h4>Línea de Tiempo del Reporte</h4>
                   <div className="timeline">
@@ -761,7 +997,7 @@ export default function CitizenDashboard({ user, onLogout }) {
                           <span className="timeline-date">
                             {new Date(h.date).toLocaleString()}
                           </span>
-                          <p>
+                          <p style={{ textAlign: 'left' }}>
                             <strong>{getStatusBadge(h.status)}</strong>: {h.note}
                           </p>
                         </div>
@@ -774,6 +1010,133 @@ export default function CitizenDashboard({ user, onLogout }) {
           )}
         </div>
       </main>
+
+      {/* Profile/Config Modal */}
+      {showProfileModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          animation: 'fade-in 0.2s ease'
+        }}>
+          <div className="modal-card card" style={{
+            width: '450px',
+            padding: '24px',
+            backgroundColor: 'var(--bg-card, #ffffff)',
+            borderRadius: 'var(--radius-md)',
+            position: 'relative',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+            textAlign: 'left'
+          }}>
+            <button
+              type="button"
+              onClick={() => setShowProfileModal(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'none',
+                border: 'none',
+                fontSize: '18px',
+                cursor: 'pointer',
+                color: 'var(--text-muted)'
+              }}
+            >
+              ✖
+            </button>
+            <h3 style={{ marginBottom: '8px' }}>👤 Configuración del Perfil</h3>
+            <p className="text-muted" style={{ marginBottom: '20px', fontSize: '13px' }}>Administra la configuración de tu cuenta y notificaciones.</p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="form-group">
+                <label>Nombre Completo</label>
+                <input type="text" value={user.name} disabled style={{ backgroundColor: 'var(--bg-main)', cursor: 'not-allowed' }} />
+              </div>
+              <div className="form-group">
+                <label>Correo Electrónico</label>
+                <input type="text" value={user.email} disabled style={{ backgroundColor: 'var(--bg-main)', cursor: 'not-allowed' }} />
+              </div>
+              
+              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px' }}>
+                <input
+                  type="checkbox"
+                  id="notif-toggle"
+                  checked={notificationsEnabled}
+                  onChange={handleToggleNotifications}
+                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                />
+                <label htmlFor="notif-toggle" style={{ margin: 0, cursor: 'pointer', fontWeight: '500' }}>
+                  Recibir notificaciones de cambios de estado
+                </label>
+              </div>
+              <p className="form-helper" style={{ margin: '-10px 0 10px 32px' }}>
+                Si se desactiva, no se registrarán alertas en el icono de campana cuando las autoridades actualicen tus reportes.
+              </p>
+            </div>
+            
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowProfileModal(false)}
+              style={{ marginTop: '20px', width: '100%' }}
+            >
+              Cerrar y Aplicar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Zoom Modal Overlay */}
+      {zoomedImage && (
+        <div className="modal-overlay" onClick={() => setZoomedImage(null)} style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 3000,
+          cursor: 'zoom-out',
+          animation: 'fade-in 0.2s ease'
+        }}>
+          <div className="zoom-image-container" style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}>
+            <img src={zoomedImage} alt="Evidencia Ampliada" style={{
+              width: '100%',
+              height: 'auto',
+              maxHeight: '80vh',
+              objectFit: 'contain',
+              borderRadius: 'var(--radius-sm)',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+            }} />
+            <button
+              type="button"
+              onClick={() => setZoomedImage(null)}
+              style={{
+                position: 'absolute',
+                top: '-40px',
+                right: '0',
+                background: 'none',
+                border: 'none',
+                color: 'white',
+                fontSize: '24px',
+                cursor: 'pointer'
+              }}
+            >
+              Cerrar ✖
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
