@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getReports, getUsers, assignReport, closeReport, rejectReport, updateReportStatusByAuthority, CATEGORIES, PRIORITIES, STATUSES } from '../mockData';
+import { getReports, getUsers, assignReport, closeReport, rejectReport, updateReportStatusByAuthority, CATEGORIES, PRIORITIES, STATUSES, getAuthorityAlerts, markAuthorityAlertRead, markAllAuthorityAlertsRead, disableReportAlerts, checkAndGenerateInactivityAlerts } from '../mockData';
 
 export default function AuthorityDashboard({ user, onLogout }) {
   const [reports, setReports] = useState([]);
@@ -32,9 +32,79 @@ export default function AuthorityDashboard({ user, onLogout }) {
   const [authorityStatusComment, setAuthorityStatusComment] = useState('');
   const [authorityNewStatus, setAuthorityNewStatus] = useState('');
 
+  // Predefined Reject reasons
+  const REJECT_REASONS = [
+    { value: 'fuera_jurisdiccion', label: 'Ubicación fuera de la jurisdicción municipal' },
+    { value: 'propiedad_privada', label: 'Incidencia en propiedad privada (no compete a la municipalidad)' },
+    { value: 'servicio_no_municipal', label: 'No corresponde a un servicio de competencia municipal' },
+    { value: 'falsa_alarma_duplicado', label: 'Reporte duplicado o falsa alarma' },
+    { value: 'evidencia_insuficiente', label: 'Información o evidencia fotográfica insuficiente' },
+    { value: 'otro', label: 'Otro (Especificar motivo...)' }
+  ];
+
+  const [selectedRejectReason, setSelectedRejectReason] = useState('fuera_jurisdiccion');
+  const [customRejectReason, setCustomRejectReason] = useState('');
+  const [manualClosureImage, setManualClosureImage] = useState(null);
+
+  // Alerts of inactivity states
+  const [alerts, setAlerts] = useState([]);
+  const [showAlertDropdown, setShowAlertDropdown] = useState(false);
+
   useEffect(() => {
     loadData();
+    loadAlerts();
+
+    const interval = setInterval(() => {
+      checkAndGenerateInactivityAlerts();
+      loadAlerts();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
+
+  const loadAlerts = () => {
+    setAlerts(getAuthorityAlerts());
+  };
+
+  const handleAlertClick = (alertItem) => {
+    markAuthorityAlertRead(alertItem.id);
+    loadAlerts();
+    setShowAlertDropdown(false);
+    
+    // Encontrar el reporte y seleccionarlo
+    const all = getReports();
+    const found = all.find(r => r.id === alertItem.reportId);
+    if (found) {
+      setSelectedReport(found);
+      // Resetear estados secundarios
+      setEstimatedDate(found.estimatedDate || '');
+      setReassignReason('');
+      setRejectReason('');
+      setSelectedRejectReason('fuera_jurisdiccion');
+      setCustomRejectReason('');
+      setManualClosureImage(null);
+      setShowRejectForm(false);
+    }
+  };
+
+  const handleDisableAlertFromNotification = (e, reportId) => {
+    e.stopPropagation();
+    disableReportAlerts(reportId, true);
+    loadData();
+    loadAlerts();
+  };
+
+  const handleToggleReportAlerts = (reportId, currentValue) => {
+    disableReportAlerts(reportId, !currentValue);
+    loadData();
+    loadAlerts();
+    // Actualizar el reporte seleccionado para que refleje el cambio de alertDisabled
+    const all = getReports();
+    const updated = all.find(r => r.id === reportId);
+    if (updated) {
+      setSelectedReport(updated);
+    }
+  };
 
   const loadData = () => {
     const all = getReports();
@@ -90,6 +160,17 @@ export default function AuthorityDashboard({ user, onLogout }) {
     reader.readAsDataURL(file);
   };
 
+  const handleManualClosureImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setManualClosureImage(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleCloseReportSubmit = (e) => {
     e.preventDefault();
     if (!selectedReport) return;
@@ -116,15 +197,20 @@ export default function AuthorityDashboard({ user, onLogout }) {
 
   const handleReject = (e) => {
     e.preventDefault();
-    if (!selectedReport || !rejectReason.trim()) return;
+    const finalReason = selectedRejectReason === 'otro' 
+      ? customRejectReason.trim() 
+      : REJECT_REASONS.find(r => r.value === selectedRejectReason)?.label;
+      
+    if (!selectedReport || !finalReason) return;
 
     setActionSuccess('');
     setActionError('');
 
     try {
-      const updated = rejectReport(selectedReport.id, rejectReason);
+      const updated = rejectReport(selectedReport.id, finalReason);
       setActionSuccess(`Reporte rechazado con éxito.`);
-      setRejectReason('');
+      setSelectedRejectReason('fuera_jurisdiccion');
+      setCustomRejectReason('');
       setShowRejectForm(false);
       setSelectedReport(updated);
       loadData();
@@ -145,7 +231,13 @@ export default function AuthorityDashboard({ user, onLogout }) {
     setActionError('');
 
     try {
-      const updated = updateReportStatusByAuthority(selectedReport.id, authorityNewStatus, authorityStatusComment);
+      let updated;
+      if (authorityNewStatus === 'closed') {
+        updated = closeReport(selectedReport.id, authorityStatusComment || 'Caso Cerrado por la Autoridad Municipal', manualClosureImage);
+        setManualClosureImage(null);
+      } else {
+        updated = updateReportStatusByAuthority(selectedReport.id, authorityNewStatus, authorityStatusComment);
+      }
       setActionSuccess(`Estado del reporte actualizado exitosamente.`);
       setAuthorityStatusComment('');
       setAuthorityNewStatus('');
@@ -157,41 +249,6 @@ export default function AuthorityDashboard({ user, onLogout }) {
       }, 3000);
     } catch (err) {
       setActionError('Error al actualizar el estado del reporte.');
-    }
-  };
-
-  const handleClosureImageChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setClosureImage(reader.result);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleCloseReportSubmit = (e) => {
-    e.preventDefault();
-    if (!selectedReport) return;
-
-    setActionSuccess('');
-    setActionError('');
-
-    try {
-      const updated = closeReport(selectedReport.id, closureComment, closureImage);
-      setActionSuccess(`Reporte cerrado y archivado exitosamente.`);
-      
-      setClosureComment('');
-      setClosureImage(null);
-      setSelectedReport(updated);
-      loadData();
-
-      setTimeout(() => {
-        setActionSuccess('');
-      }, 3000);
-    } catch (err) {
-      setActionError('Error al cerrar el reporte. Inténtelo de nuevo.');
     }
   };
 
@@ -247,7 +304,146 @@ export default function AuthorityDashboard({ user, onLogout }) {
             <span className="user-role-badge authority">Autoridad Municipal</span>
           </div>
         </div>
-        <div className="header-actions">
+        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
+          {/* Campana de Alertas de Inactividad */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowAlertDropdown(!showAlertDropdown)}
+              style={{
+                background: 'var(--bg-main)',
+                border: '1px solid var(--border)',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'all 0.2s',
+                zIndex: 10
+              }}
+              title="Alertas de inactividad de reportes"
+            >
+              🔔
+              {alerts.filter(a => !a.read).length > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  background: '#ef4444',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '20px',
+                  height: '20px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {alerts.filter(a => !a.read).length}
+                </span>
+              )}
+            </button>
+
+            {showAlertDropdown && (
+              <div className="card" style={{
+                position: 'absolute',
+                top: '50px',
+                right: '0',
+                width: '350px',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                zIndex: 1000,
+                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                padding: 0
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  borderBottom: '1px solid var(--border)'
+                }}>
+                  <strong style={{ fontSize: '13px', color: 'var(--text)' }}>⚠️ Reportes Sin Atención</strong>
+                  {alerts.filter(a => !a.read).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        markAllAuthorityAlertsRead();
+                        loadAlerts();
+                      }}
+                      style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
+                    >
+                      Marcar todo leídos
+                    </button>
+                  )}
+                </div>
+                <div>
+                  {alerts.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                      No hay alertas de inactividad.
+                    </div>
+                  ) : (
+                    alerts.map(a => (
+                      <div
+                        key={a.id}
+                        onClick={() => handleAlertClick(a)}
+                        style={{
+                          padding: '12px 16px',
+                          borderBottom: '1px solid var(--border)',
+                          cursor: 'pointer',
+                          backgroundColor: !a.read ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px',
+                          textAlign: 'left',
+                          transition: 'background-color 0.2s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' }}>
+                          <span style={{ color: 'var(--danger)', fontWeight: 'bold' }}>
+                            ⚠️ Sin actualizar: {a.daysElapsed} días
+                          </span>
+                          <span>{new Date(a.date).toLocaleDateString()}</span>
+                        </div>
+                        <span style={{ fontSize: '12px', fontWeight: !a.read ? '600' : '400', color: 'var(--text)' }}>
+                          {a.reportTitle}
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                          <span><strong>Cat:</strong> {a.category}</span>
+                          <span>•</span>
+                          <span><strong>Zona:</strong> {a.zone}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDisableAlertFromNotification(e, a.reportId)}
+                            style={{
+                              background: 'rgba(0,0,0,0.05)',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              color: 'var(--text-muted)'
+                            }}
+                            title="Dejar de recibir avisos de inactividad de este reporte"
+                          >
+                            🔕 Desactivar avisos
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
             className="btn btn-secondary"
@@ -365,6 +561,7 @@ export default function AuthorityDashboard({ user, onLogout }) {
                       <th>Código</th>
                       <th>Incidencia</th>
                       <th>Categoría</th>
+                      <th>Fecha de Envío</th>
                       <th>Urgencia</th>
                       <th>Estado</th>
                       <th>Asignado a</th>
@@ -393,6 +590,7 @@ export default function AuthorityDashboard({ user, onLogout }) {
                           </div>
                         </td>
                         <td>{getCategoryIcon(rep.category)}</td>
+                        <td>{new Date(rep.createdAt).toLocaleDateString('es-CR')}</td>
                         <td>{getPriorityBadge(rep.priority)}</td>
                         <td>{getStatusBadge(rep.status)}</td>
                         <td>
@@ -417,6 +615,9 @@ export default function AuthorityDashboard({ user, onLogout }) {
                               setEstimatedDate(rep.estimatedDate || '');
                               setReassignReason('');
                               setRejectReason('');
+                              setSelectedRejectReason('fuera_jurisdiccion');
+                              setCustomRejectReason('');
+                              setManualClosureImage(null);
                               setShowRejectForm(false);
                             }}
                           >
@@ -464,6 +665,22 @@ export default function AuthorityDashboard({ user, onLogout }) {
                   <div className="meta-item">
                     <strong>Prioridad:</strong>
                     <span>{getPriorityBadge(selectedReport.priority)}</span>
+                  </div>
+                  <div className="meta-item" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '5px' }}>
+                    <strong>🔔 Alertas de inactividad:</strong>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', color: selectedReport.alertDisabled ? 'var(--text-muted)' : 'var(--danger)', fontWeight: '600' }}>
+                        {selectedReport.alertDisabled ? 'Desactivadas' : 'Activas'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleReportAlerts(selectedReport.id, selectedReport.alertDisabled)}
+                        className={`btn ${selectedReport.alertDisabled ? 'btn-secondary' : 'btn-primary'}`}
+                        style={{ padding: '4px 8px', fontSize: '11px', margin: 0, height: 'auto', backgroundColor: selectedReport.alertDisabled ? 'var(--border)' : 'rgba(239, 68, 68, 0.1)', color: selectedReport.alertDisabled ? 'var(--text)' : 'var(--danger)', border: selectedReport.alertDisabled ? '1px solid var(--border)' : '1px solid rgba(239, 68, 68, 0.3)' }}
+                      >
+                        {selectedReport.alertDisabled ? '🔔 Activar' : '🔕 Desactivar'}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -515,6 +732,47 @@ export default function AuthorityDashboard({ user, onLogout }) {
                   <p className="location-box">📍 {selectedReport.location}</p>
                 </div>
 
+                {/* Control de alertas de inactividad (visible si no está cerrado ni rechazado) */}
+                {selectedReport.status !== 'closed' && selectedReport.status !== 'rejected' && (
+                  <div className="detail-section" style={{
+                    padding: '12px 16px',
+                    backgroundColor: selectedReport.alertDisabled ? 'rgba(107, 114, 128, 0.05)' : 'rgba(239, 68, 68, 0.05)',
+                    border: `1px solid ${selectedReport.alertDisabled ? 'rgba(107, 114, 128, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                    borderRadius: 'var(--radius-sm)',
+                    marginBottom: '20px',
+                    textAlign: 'left',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '12px'
+                  }}>
+                    <div>
+                      <strong style={{ fontSize: '13px' }}>
+                        {selectedReport.alertDisabled ? '🔕 Alertas de inactividad desactivadas' : '🔔 Alertas de inactividad activas'}
+                      </strong>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                        {selectedReport.alertDisabled
+                          ? 'No se generarán avisos aunque este reporte permanezca sin actualización por más de 3 días.'
+                          : 'Recibirás un aviso si este reporte lleva más de 3 días sin actualización de estado.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleReportAlerts(selectedReport.id, selectedReport.alertDisabled)}
+                      className="btn btn-secondary btn-sm"
+                      style={{
+                        whiteSpace: 'nowrap',
+                        fontSize: '11px',
+                        padding: '6px 12px',
+                        borderColor: selectedReport.alertDisabled ? 'var(--primary)' : 'var(--text-muted)',
+                        color: selectedReport.alertDisabled ? 'var(--primary)' : 'var(--text-muted)'
+                      }}
+                    >
+                      {selectedReport.alertDisabled ? '🔔 Reactivar' : '🔕 Desactivar'}
+                    </button>
+                  </div>
+                )}
+
                 {/* Rejection Details (if rejected) */}
                 {selectedReport.status === 'rejected' && (
                   <div className="detail-section rejection-details card" style={{ padding: '16px', backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-sm)', marginBottom: '20px', textAlign: 'left' }}>
@@ -550,17 +808,32 @@ export default function AuthorityDashboard({ user, onLogout }) {
                     <h4 style={{ color: 'var(--danger)', margin: '0 0 10px 0' }}>🚫 Rechazar Incidencia</h4>
                     <form onSubmit={handleReject} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label htmlFor="reject-note">Motivo de Rechazo (Será notificado al ciudadano):</label>
-                        <textarea
-                          id="reject-note"
-                          rows="3"
-                          placeholder="Ej. La incidencia descrita se ubica en propiedad privada y no compete a esta municipalidad."
-                          value={rejectReason}
-                          onChange={(e) => setRejectReason(e.target.value)}
-                          required
-                          style={{ width: '100%' }}
-                        ></textarea>
+                        <label htmlFor="reject-reason-select">Seleccione Motivo de Rechazo:</label>
+                        <select
+                          id="reject-reason-select"
+                          value={selectedRejectReason}
+                          onChange={(e) => setSelectedRejectReason(e.target.value)}
+                          style={{ width: '100%', padding: '8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}
+                        >
+                          {REJECT_REASONS.map((r) => (
+                            <option key={r.value} value={r.value}>{r.label}</option>
+                          ))}
+                        </select>
                       </div>
+                      {selectedRejectReason === 'otro' && (
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label htmlFor="reject-note">Motivo de Rechazo Personalizado (Será notificado al ciudadano):</label>
+                          <textarea
+                            id="reject-note"
+                            rows="3"
+                            placeholder="Describa detalladamente el motivo de rechazo..."
+                            value={customRejectReason}
+                            onChange={(e) => setCustomRejectReason(e.target.value)}
+                            required
+                            style={{ width: '100%' }}
+                          ></textarea>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button type="submit" className="btn btn-primary" style={{ flex: 1, backgroundColor: 'var(--danger)', borderColor: 'var(--danger)', color: 'white' }}>
                           Confirmar Rechazo
@@ -650,17 +923,35 @@ export default function AuthorityDashboard({ user, onLogout }) {
                           <option value="">Seleccionar Estado...</option>
                           <option value="in_progress">En gestión (En Progreso)</option>
                           <option value="resolved">Resuelto</option>
+                          <option value="closed">Cerrado y Archivado</option>
                         </select>
                       </div>
                       <div className="form-group" style={{ marginBottom: 0 }}>
                         <input
                           type="text"
-                          placeholder="Comentario sobre el avance..."
+                          placeholder={authorityNewStatus === 'closed' ? "Comentario de cierre obligatorio..." : "Comentario sobre el avance..."}
                           value={authorityStatusComment}
                           onChange={(e) => setAuthorityStatusComment(e.target.value)}
+                          required={authorityNewStatus === 'closed'}
                           style={{ width: '100%', padding: '6px' }}
                         />
                       </div>
+                      {authorityNewStatus === 'closed' && (
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: '12px', display: 'block', marginBottom: '4px' }}>Foto de Evidencia de Cierre (Opcional):</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleManualClosureImageChange}
+                            style={{ display: 'block', marginTop: '6px', fontSize: '12px' }}
+                          />
+                          {manualClosureImage && (
+                            <div style={{ marginTop: '10px', width: '100px', height: '75px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                              <img src={manualClosureImage} alt="Preview Cierre" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <button type="submit" className="btn btn-secondary btn-sm" style={{ width: '100%' }}>
                         Actualizar Estado
                       </button>

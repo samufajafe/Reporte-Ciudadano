@@ -46,7 +46,7 @@ const INITIAL_REPORTS = [
     title: 'Fuga de agua masiva en Av. Central',
     description: 'Hay una tubería rota que está inundando la acera frente al supermercado. Se están desperdiciando cientos de litros de agua potable.',
     category: 'agua',
-    location: 'Av. Central, entre Calle 4 y 6, frente al Súper Más',
+    location: 'San José, San José, Carmen - Av. Central, entre Calle 4 y 6, frente al Súper Más',
     priority: 'high',
     status: 'assigned',
     assignedTo: 'campo@municipal.go.cr',
@@ -65,7 +65,7 @@ const INITIAL_REPORTS = [
     title: 'Lámpara de poste parpadea constantemente',
     description: 'La luminaria pública número LP-452 se apaga y enciende constantemente por las noches, dejando la esquina a oscuras a ratos.',
     category: 'alumbrado',
-    location: 'Calle Los Almendros, Esquina con Av. 12',
+    location: 'San José, San José, Merced - Calle Los Almendros, Esquina con Av. 12',
     priority: 'low',
     status: 'received',
     citizenEmail: 'maria.rodriguez@gmail.com',
@@ -134,6 +134,12 @@ export const assignReport = (reportId, staffEmail, estimatedDate, reassignReason
   const index = reports.findIndex(r => r.id === reportId);
   if (index !== -1) {
     const report = reports[index];
+    if (report.status === 'rejected') {
+      throw new Error('Un reporte rechazado no puede ser asignado al personal de campo.');
+    }
+    if (report.status === 'closed') {
+      throw new Error('Un reporte cerrado no puede ser asignado al personal de campo.');
+    }
     const previousAssignee = report.assignedTo;
     const isReassignment = previousAssignee && previousAssignee.toLowerCase() !== staffEmail.toLowerCase();
     
@@ -166,6 +172,9 @@ export const assignReport = (reportId, staffEmail, estimatedDate, reassignReason
     // Notificar al ciudadano
     createNotification(reportId, 'assigned', `Asignado a personal de campo (${staffEmail}). Fecha estimada: ${estimatedDate}`);
 
+    // Limpiar alertas de inactividad ya que se actualizó el reporte
+    clearInactivityAlerts(reportId);
+
     return report;
   }
   throw new Error('Reporte no encontrado');
@@ -189,6 +198,9 @@ export const updateReportStatus = (reportId, newStatus, note = '') => {
     
     // Notificar al ciudadano
     createNotification(reportId, newStatus, note);
+
+    // Limpiar alertas de inactividad ya que se actualizó el reporte
+    clearInactivityAlerts(reportId);
 
     return reports[index];
   }
@@ -294,6 +306,9 @@ export const closeReport = (reportId, closureComment, closureImage) => {
     // Notificar al ciudadano
     createNotification(reportId, 'closed', closureComment);
 
+    // Limpiar alertas de inactividad
+    clearInactivityAlerts(reportId);
+
     return reports[index];
   }
   throw new Error('Reporte no encontrado');
@@ -308,6 +323,9 @@ export const createNotificationForUser = (email, reportId, message) => {
     return;
   }
 
+  const reports = getReports();
+  const report = reports.find(r => r.id === reportId);
+
   const notifications = JSON.parse(localStorage.getItem('rc_notifications') || '[]');
   
   const newNotif = {
@@ -318,7 +336,15 @@ export const createNotificationForUser = (email, reportId, message) => {
     newStatus: 'Notificación',
     note: '',
     date: new Date().toISOString(),
-    read: false
+    read: false,
+    reportDetails: report ? {
+      category: report.category,
+      description: report.description,
+      location: report.location,
+      imagesCount: report.images ? report.images.length : 0,
+      images: report.images || [],
+      estimatedDate: report.estimatedDate || ''
+    } : null
   };
 
   notifications.unshift(newNotif);
@@ -341,6 +367,9 @@ export const rejectReport = (reportId, rejectReason) => {
     
     // Notificar al ciudadano
     createNotification(reportId, 'rejected', `Reporte rechazado. Motivo: ${rejectReason}`);
+
+    // Limpiar alertas de inactividad
+    clearInactivityAlerts(reportId);
 
     return reports[index];
   }
@@ -368,7 +397,116 @@ export const updateReportStatusByAuthority = (reportId, newStatus, comment = '')
       createNotificationForUser(reports[index].assignedTo, reportId, `El estado del reporte asignado "${reports[index].title}" cambió a ${newStatus}.`);
     }
 
+    // Limpiar alertas de inactividad
+    clearInactivityAlerts(reportId);
+
     return reports[index];
   }
   throw new Error('Reporte no encontrado');
+};
+
+// Limpiar alertas de inactividad de un reporte específico
+export const clearInactivityAlerts = (reportId) => {
+  const alerts = JSON.parse(localStorage.getItem('rc_authority_alerts') || '[]');
+  const filtered = alerts.filter(a => a.reportId !== reportId);
+  localStorage.setItem('rc_authority_alerts', JSON.stringify(filtered));
+};
+
+// Activar o desactivar alertas para un reporte específico
+export const disableReportAlerts = (reportId, disabledValue) => {
+  const reports = getReports();
+  const index = reports.findIndex(r => r.id === reportId);
+  if (index !== -1) {
+    reports[index].alertDisabled = disabledValue;
+    localStorage.setItem('rc_reports', JSON.stringify(reports));
+    
+    if (disabledValue) {
+      clearInactivityAlerts(reportId);
+    }
+    return reports[index];
+  }
+  throw new Error('Reporte no encontrado');
+};
+
+// Obtener alertas de la autoridad
+export const getAuthorityAlerts = () => {
+  return JSON.parse(localStorage.getItem('rc_authority_alerts') || '[]');
+};
+
+// Marcar alerta como leída
+export const markAuthorityAlertRead = (alertId) => {
+  const alerts = JSON.parse(localStorage.getItem('rc_authority_alerts') || '[]');
+  const index = alerts.findIndex(a => a.id === alertId);
+  if (index !== -1) {
+    alerts[index].read = true;
+    localStorage.setItem('rc_authority_alerts', JSON.stringify(alerts));
+  }
+};
+
+// Marcar todas las alertas como leídas
+export const markAllAuthorityAlertsRead = () => {
+  const alerts = JSON.parse(localStorage.getItem('rc_authority_alerts') || '[]');
+  alerts.forEach(a => {
+    a.read = true;
+  });
+  localStorage.setItem('rc_authority_alerts', JSON.stringify(alerts));
+};
+
+// Verificar e inyectar alertas automáticas de inactividad
+export const checkAndGenerateInactivityAlerts = () => {
+  const reports = getReports();
+  const alerts = JSON.parse(localStorage.getItem('rc_authority_alerts') || '[]');
+  const now = new Date();
+  let updatedAlerts = [...alerts];
+  let alertsChanged = false;
+
+  reports.forEach(report => {
+    // Si ya está resuelto, cerrado o rechazado, no genera alerta
+    if (['resolved', 'closed', 'rejected'].includes(report.status)) {
+      return;
+    }
+    
+    // Si tiene alertas desactivadas, no genera alerta
+    if (report.alertDisabled) {
+      return;
+    }
+
+    // Calcular el tiempo transcurrido desde el último evento de historial
+    const lastEvent = report.history && report.history.length > 0 
+      ? report.history[report.history.length - 1] 
+      : { date: report.createdAt };
+      
+    const lastUpdateDate = new Date(lastEvent.date);
+    const diffTime = Math.abs(now - lastUpdateDate);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 3) {
+      // Verificar si ya existe una alerta activa para este reporte correspondiente a esta misma última actualización de estado
+      const hasRecentAlert = updatedAlerts.some(a => a.reportId === report.id && new Date(a.date) >= lastUpdateDate);
+      
+      if (!hasRecentAlert) {
+        const categoryObj = CATEGORIES.find(c => c.id === report.category);
+        const categoryLabel = categoryObj ? categoryObj.label : report.category;
+        const zone = report.location || 'Zona no especificada';
+
+        const newAlert = {
+          id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          reportId: report.id,
+          reportTitle: report.title,
+          category: categoryLabel,
+          zone: zone,
+          daysElapsed: diffDays,
+          date: now.toISOString(),
+          read: false
+        };
+
+        updatedAlerts.unshift(newAlert);
+        alertsChanged = true;
+      }
+    }
+  });
+
+  if (alertsChanged) {
+    localStorage.setItem('rc_authority_alerts', JSON.stringify(updatedAlerts));
+  }
 };

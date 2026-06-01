@@ -182,36 +182,85 @@ export default function FieldStaffDashboard({ user, onLogout }) {
                     </button>
                   )}
                 </div>
-                <div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {notifications.length === 0 ? (
                     <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
                       No tienes notificaciones
                     </div>
                   ) : (
-                    notifications.map(n => (
-                      <div
-                        key={n.id}
-                        onClick={() => handleNotificationClick(n)}
-                        style={{
-                          padding: '12px 16px',
-                          borderBottom: '1px solid var(--border)',
-                          cursor: 'pointer',
-                          backgroundColor: !n.read ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                          textAlign: 'left'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' }}>
-                          <strong>{!n.read ? '🔵 Nuevo' : '✓ Leído'}</strong>
-                          <span>{new Date(n.date).toLocaleDateString()}</span>
+                    notifications.map(n => {
+                      const details = n.reportDetails;
+                      return (
+                        <div
+                          key={n.id}
+                          onClick={() => handleNotificationClick(n)}
+                          style={{
+                            padding: '12px 16px',
+                            borderBottom: '1px solid var(--border)',
+                            cursor: 'pointer',
+                            backgroundColor: !n.read ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px',
+                            textAlign: 'left',
+                            transition: 'background-color 0.2s'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' }}>
+                            <strong style={{ color: !n.read ? 'var(--primary)' : 'var(--text-muted)' }}>
+                              {!n.read ? '🔵 NUEVA ASIGNACIÓN' : '✓ Leído'}
+                            </strong>
+                            <span>{new Date(n.date).toLocaleDateString('es-CR')}</span>
+                          </div>
+                          
+                          <div style={{ fontSize: '12px', fontWeight: !n.read ? '600' : '400', color: 'var(--text-main)' }}>
+                            {n.reportTitle}
+                          </div>
+                          
+                          {details && (
+                            <div style={{
+                              fontSize: '11px',
+                              backgroundColor: 'var(--bg-main)',
+                              padding: '8px',
+                              borderRadius: '4px',
+                              border: '1px solid var(--border)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px',
+                              color: 'var(--text-muted)'
+                            }}>
+                              <div><strong>Categoría:</strong> {getCategoryIcon(details.category)}</div>
+                              {details.description && (
+                                <div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <strong>Descripción:</strong> {details.description}
+                                </div>
+                              )}
+                              <div><strong>Ubicación:</strong> 📍 {details.location}</div>
+                              {details.estimatedDate && (
+                                <div><strong>Fecha Est. Atención:</strong> 📅 {new Date(details.estimatedDate + 'T12:00:00').toLocaleDateString('es-CR')}</div>
+                              )}
+                              {details.images && details.images.length > 0 && (
+                                <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                  {details.images.slice(0, 3).map((img, idx) => (
+                                    <img 
+                                      key={idx} 
+                                      src={img} 
+                                      alt="preview" 
+                                      style={{ width: '32px', height: '24px', objectFit: 'cover', borderRadius: '2px', border: '1px solid var(--border)' }} 
+                                    />
+                                  ))}
+                                  {details.images.length > 3 && (
+                                    <span style={{ fontSize: '9px', display: 'flex', alignItems: 'center', color: 'var(--primary)' }}>
+                                      +{details.images.length - 3} más
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <span style={{ fontSize: '13px', fontWeight: !n.read ? '600' : '400' }}>
-                          {n.reportTitle}
-                        </span>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
