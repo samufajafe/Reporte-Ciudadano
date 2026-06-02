@@ -21,17 +21,79 @@ const FALLBACK_GEOGRAPHY = {
     '2': [
       { id: '201', nombre: 'Alajuela' },
       { id: '202', nombre: 'San Ramón' }
+    ],
+    '3': [
+      { id: '301', nombre: 'Cartago' },
+      { id: '302', nombre: 'Paraíso' }
+    ],
+    '4': [
+      { id: '401', nombre: 'Heredia' },
+      { id: '402', nombre: 'Barva' }
+    ],
+    '5': [
+      { id: '501', nombre: 'Liberia' },
+      { id: '502', nombre: 'Nicoya' }
+    ],
+    '6': [
+      { id: '601', nombre: 'Puntarenas' },
+      { id: '602', nombre: 'Esparza' }
+    ],
+    '7': [
+      { id: '701', nombre: 'Limón' },
+      { id: '702', nombre: 'Pococí' }
     ]
   },
   distritos: {
+    '101': [
+      { id: '10101', nombre: 'Carmen' },
+      { id: '10102', nombre: 'Merced' }
+    ],
     '102': [
       { id: '10201', nombre: 'Escazú Centro' },
       { id: '10202', nombre: 'San Antonio' },
       { id: '10203', nombre: 'San Rafael' }
     ],
-    '101': [
-      { id: '10101', nombre: 'Carmen' },
-      { id: '10102', nombre: 'Merced' }
+    '103': [
+      { id: '10301', nombre: 'Desamparados Centro' }
+    ],
+    '201': [
+      { id: '20101', nombre: 'Alajuela Centro' },
+      { id: '20102', nombre: 'San José' }
+    ],
+    '202': [
+      { id: '20201', nombre: 'San Ramón Centro' }
+    ],
+    '301': [
+      { id: '30101', nombre: 'Oriental' },
+      { id: '30102', nombre: 'Occidental' }
+    ],
+    '302': [
+      { id: '30201', nombre: 'Paraíso Centro' }
+    ],
+    '401': [
+      { id: '40101', nombre: 'Heredia Centro' },
+      { id: '40102', nombre: 'Mercedes' }
+    ],
+    '402': [
+      { id: '40201', nombre: 'Barva Centro' }
+    ],
+    '501': [
+      { id: '50101', nombre: 'Liberia Centro' }
+    ],
+    '502': [
+      { id: '50201', nombre: 'Nicoya Centro' }
+    ],
+    '601': [
+      { id: '60101', nombre: 'Puntarenas Centro' }
+    ],
+    '602': [
+      { id: '60201', nombre: 'Esparza Centro' }
+    ],
+    '701': [
+      { id: '70101', nombre: 'Limón Centro' }
+    ],
+    '702': [
+      { id: '70201', nombre: 'Guápiles' }
     ]
   }
 };
@@ -122,6 +184,12 @@ export default function CitizenDashboard({ user, onLogout }) {
   // Fetch Cantones when Provincia changes
   useEffect(() => {
     if (selectedProvincia) {
+      // Clear dependent selections immediately to prevent displaying mixed-up data
+      setCantones([]);
+      setDistritos([]);
+      setSelectedCanton('');
+      setSelectedDistrito('');
+      
       fetchCantones(selectedProvincia);
     } else {
       setCantones([]);
@@ -134,6 +202,10 @@ export default function CitizenDashboard({ user, onLogout }) {
   // Fetch Distritos when Canton changes
   useEffect(() => {
     if (selectedCanton) {
+      // Clear district selection immediately while loading new ones
+      setDistritos([]);
+      setSelectedDistrito('');
+      
       fetchDistritos(selectedCanton);
     } else {
       setDistritos([]);
@@ -156,6 +228,7 @@ export default function CitizenDashboard({ user, onLogout }) {
       const response = await fetch('https://api-geo-cr.vercel.app/provincias');
       if (!response.ok) throw new Error('API down');
       const json = await response.json();
+      console.log('API Provinces response:', json.data);
       
       // Map API fields (idProvincia, descripcion) to unified structure ({ id, nombre })
       const mapped = (json.data || []).map(p => ({
@@ -182,6 +255,7 @@ export default function CitizenDashboard({ user, onLogout }) {
       const response = await fetch(`https://api-geo-cr.vercel.app/provincias/${provinciaId}/cantones`);
       if (!response.ok) throw new Error('API down');
       const json = await response.json();
+      console.log(`API Cantons response for province ${provinciaId}:`, json.data);
       
       const mapped = (json.data || []).map(c => ({
         id: String(c.idCanton),
@@ -210,6 +284,7 @@ export default function CitizenDashboard({ user, onLogout }) {
       const response = await fetch(`https://api-geo-cr.vercel.app/cantones/${cantonId}/distritos`);
       if (!response.ok) throw new Error('API down');
       const json = await response.json();
+      console.log(`API Districts response for canton ${cantonId}:`, json.data);
       
       const mapped = (json.data || []).map(d => ({
         id: String(d.idDistrito),
@@ -832,16 +907,16 @@ export default function CitizenDashboard({ user, onLogout }) {
                         key={rep.id}
                         className={selectedReport?.id === rep.id ? 'row-selected' : ''}
                       >
-                        <td><span className="code-tag">{rep.id}</span></td>
-                        <td>
+                        <td data-label="Código"><span className="code-tag">{rep.id}</span></td>
+                        <td data-label="Incidencia">
                           <div className="table-report-info">
                             <strong>{rep.title}</strong>
                             <span className="text-muted truncate-text">{rep.location}</span>
                           </div>
                         </td>
-                        <td>{getCategoryIcon(rep.category)}</td>
-                        <td>{new Date(rep.createdAt).toLocaleDateString()}</td>
-                        <td>
+                        <td data-label="Categoría">{getCategoryIcon(rep.category)}</td>
+                        <td data-label="Fecha">{new Date(rep.createdAt).toLocaleDateString()}</td>
+                        <td data-label="Evidencia">
                           {rep.images && rep.images.length > 0 ? (
                             <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: '600' }}>
                               📸 {rep.images.length} foto(s)
@@ -850,8 +925,8 @@ export default function CitizenDashboard({ user, onLogout }) {
                             <span className="text-muted">Sin fotos</span>
                           )}
                         </td>
-                        <td>{getStatusBadge(rep.status)}</td>
-                        <td>
+                        <td data-label="Estado">{getStatusBadge(rep.status)}</td>
+                        <td data-label="Acciones">
                           <button
                             type="button"
                             className="btn btn-secondary btn-xs"
@@ -870,9 +945,12 @@ export default function CitizenDashboard({ user, onLogout }) {
               </div>
             )}
           </section>
+        </div>
 
-          {selectedReport && (
-            <section className="report-detail-section card animate-fade-in">
+        {/* Detail Drawer Overlay */}
+        {selectedReport && (
+          <div className="drawer-overlay" onClick={() => setSelectedReport(null)}>
+            <section className="report-detail-section card drawer-panel animate-fade-in" onClick={(e) => e.stopPropagation()}>
               <div className="card-header detail-header">
                 <div>
                   <span className="code-tag">{selectedReport.id}</span>
@@ -1007,8 +1085,8 @@ export default function CitizenDashboard({ user, onLogout }) {
                 </div>
               </div>
             </section>
-          )}
-        </div>
+          </div>
+        )}
       </main>
 
       {/* Profile/Config Modal */}

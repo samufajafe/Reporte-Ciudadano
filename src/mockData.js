@@ -185,6 +185,9 @@ export const updateReportStatus = (reportId, newStatus, note = '') => {
   const reports = getReports();
   const index = reports.findIndex(r => r.id === reportId);
   if (index !== -1) {
+    if (reports[index].status === 'closed' || reports[index].status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
     reports[index].status = newStatus;
     if (note) {
       reports[index].notes = note;
@@ -293,6 +296,9 @@ export const closeReport = (reportId, closureComment, closureImage) => {
   const reports = getReports();
   const index = reports.findIndex(r => r.id === reportId);
   if (index !== -1) {
+    if (reports[index].status === 'closed' || reports[index].status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
     reports[index].status = 'closed';
     reports[index].closureComment = closureComment || '';
     reports[index].closureImage = closureImage || null;
@@ -356,6 +362,9 @@ export const rejectReport = (reportId, rejectReason) => {
   const reports = getReports();
   const index = reports.findIndex(r => r.id === reportId);
   if (index !== -1) {
+    if (reports[index].status === 'closed' || reports[index].status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
     reports[index].status = 'rejected';
     reports[index].rejectReason = rejectReason || '';
     reports[index].history.push({
@@ -381,6 +390,9 @@ export const updateReportStatusByAuthority = (reportId, newStatus, comment = '')
   const reports = getReports();
   const index = reports.findIndex(r => r.id === reportId);
   if (index !== -1) {
+    if (reports[index].status === 'closed' || reports[index].status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
     reports[index].status = newStatus;
     reports[index].history.push({
       date: new Date().toISOString(),
@@ -452,6 +464,153 @@ export const markAllAuthorityAlertsRead = () => {
   localStorage.setItem('rc_authority_alerts', JSON.stringify(alerts));
 };
 
+// Crear alerta/notificación específica para la autoridad
+export const createAuthorityNotification = (reportId, type, message) => {
+  const reports = getReports();
+  const report = reports.find(r => r.id === reportId);
+  const alerts = JSON.parse(localStorage.getItem('rc_authority_alerts') || '[]');
+  const now = new Date();
+  
+  const categoryObj = CATEGORIES.find(c => c.id === (report ? report.category : ''));
+  const categoryLabel = categoryObj ? categoryObj.label : (report ? report.category : '');
+  const zone = report ? (report.location || 'Zona no especificada') : '';
+
+  const newAlert = {
+    id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    reportId: reportId,
+    reportTitle: report ? report.title : 'Notificación',
+    category: categoryLabel,
+    zone: zone,
+    message: message,
+    type: type, // 'resolved' o 'cannot_resolve'
+    date: now.toISOString(),
+    read: false
+  };
+
+  alerts.unshift(newAlert);
+  localStorage.setItem('rc_authority_alerts', JSON.stringify(alerts));
+};
+
+// Registrar resolución de un problema por el personal de campo (operario)
+export const resolveReportByFieldStaff = (reportId, comment, resolutionImages) => {
+  const reports = getReports();
+  const index = reports.findIndex(r => r.id === reportId);
+  if (index !== -1) {
+    const report = reports[index];
+    if (report.status === 'closed' || report.status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
+    
+    report.status = 'resolved';
+    report.resolutionComment = comment;
+    report.resolutionImages = resolutionImages || [];
+    report.resolutionDate = new Date().toISOString();
+    
+    report.history.push({
+      date: new Date().toISOString(),
+      status: 'resolved',
+      note: `Marcado como Resuelto por el operario. Comentario: ${comment}`,
+      images: resolutionImages || []
+    });
+    
+    localStorage.setItem('rc_reports', JSON.stringify(reports));
+    
+    // Notificar al ciudadano
+    createNotification(reportId, 'resolved', comment);
+    
+    // Notificar a la autoridad
+    createAuthorityNotification(
+      reportId, 
+      'resolved', 
+      `El reporte "${report.title}" fue marcado como Resuelto por el operario. Comentario: "${comment}"`
+    );
+    
+    // Limpiar alertas de inactividad
+    clearInactivityAlerts(reportId);
+    
+    return report;
+  }
+  throw new Error('Reporte no encontrado');
+};
+
+// Registrar imposibilidad de resolución por el personal de campo (operario)
+export const reportImpossibilityByFieldStaff = (reportId, reason) => {
+  const reports = getReports();
+  const index = reports.findIndex(r => r.id === reportId);
+  if (index !== -1) {
+    const report = reports[index];
+    if (report.status === 'closed' || report.status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
+    
+    // El estado del reporte permanece en En gestión (su estado actual)
+    report.history.push({
+      date: new Date().toISOString(),
+      status: report.status,
+      note: `Imposibilidad de resolución reportada. Motivo: ${reason}`
+    });
+    
+    localStorage.setItem('rc_reports', JSON.stringify(reports));
+    
+    // Notificar a la autoridad
+    createAuthorityNotification(
+      reportId, 
+      'cannot_resolve', 
+      `No se pudo resolver el reporte "${report.title}". Motivo: "${reason}"`
+    );
+    
+    // Limpiar alertas de inactividad al haber novedades
+    clearInactivityAlerts(reportId);
+    
+    return report;
+  }
+  throw new Error('Reporte no encontrado');
+};
+
+// Devolver reporte al personal de campo por parte de la autoridad
+export const returnReportToFieldStaff = (reportId, returnReason) => {
+  const reports = getReports();
+  const index = reports.findIndex(r => r.id === reportId);
+  if (index !== -1) {
+    const report = reports[index];
+    if (report.status === 'closed' || report.status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
+    
+    report.status = 'assigned'; // Vuelve a asignado (En gestión)
+    
+    report.history.push({
+      date: new Date().toISOString(),
+      status: 'assigned',
+      note: `Devuelto al personal de campo. Motivo de devolución: ${returnReason}`
+    });
+    
+    localStorage.setItem('rc_reports', JSON.stringify(reports));
+    
+    // Notificar al operario asignado
+    if (report.assignedTo) {
+      createNotificationForUser(
+        report.assignedTo, 
+        reportId, 
+        `El reporte "${report.title}" fue devuelto para revisión. Motivo: ${returnReason}`
+      );
+    }
+    
+    // Notificar al ciudadano
+    createNotification(
+      reportId, 
+      'assigned', 
+      `El reporte vuelve a estar en gestión para corregir observaciones. Motivo: ${returnReason}`
+    );
+    
+    // Limpiar alertas de inactividad
+    clearInactivityAlerts(reportId);
+    
+    return report;
+  }
+  throw new Error('Reporte no encontrado');
+};
+
 // Verificar e inyectar alertas automáticas de inactividad
 export const checkAndGenerateInactivityAlerts = () => {
   const reports = getReports();
@@ -497,6 +656,7 @@ export const checkAndGenerateInactivityAlerts = () => {
           zone: zone,
           daysElapsed: diffDays,
           date: now.toISOString(),
+          type: 'inactivity',
           read: false
         };
 
@@ -510,3 +670,4 @@ export const checkAndGenerateInactivityAlerts = () => {
     localStorage.setItem('rc_authority_alerts', JSON.stringify(updatedAlerts));
   }
 };
+
