@@ -237,13 +237,9 @@ export default function CitizenDashboard({ user, onLogout }) {
       }));
 
       setProvincias(mapped);
-      if (mapped.length > 0) {
-        setSelectedProvincia(mapped[0].id);
-      }
     } catch (error) {
       console.warn('Using local fallback for Provincias:', error);
       setProvincias(FALLBACK_GEOGRAPHY.provincias);
-      setSelectedProvincia(FALLBACK_GEOGRAPHY.provincias[0].id);
     } finally {
       setIsLoadingGeo(false);
     }
@@ -251,11 +247,13 @@ export default function CitizenDashboard({ user, onLogout }) {
 
   const fetchCantones = async (provinciaId) => {
     setIsLoadingGeo(true);
+    // Swap Cartago (3) and Heredia (4) because the API has them swapped
+    const apiProvinciaId = provinciaId === '3' ? '4' : (provinciaId === '4' ? '3' : provinciaId);
     try {
-      const response = await fetch(`https://api-geo-cr.vercel.app/provincias/${provinciaId}/cantones`);
+      const response = await fetch(`https://api-geo-cr.vercel.app/provincias/${apiProvinciaId}/cantones`);
       if (!response.ok) throw new Error('API down');
       const json = await response.json();
-      console.log(`API Cantons response for province ${provinciaId}:`, json.data);
+      console.log(`API Cantons response for province ${apiProvinciaId}:`, json.data);
       
       const mapped = (json.data || []).map(c => ({
         id: String(c.idCanton),
@@ -263,16 +261,10 @@ export default function CitizenDashboard({ user, onLogout }) {
       }));
 
       setCantones(mapped);
-      if (mapped.length > 0) {
-        setSelectedCanton(mapped[0].id);
-      }
     } catch (error) {
       console.warn('Using local fallback for Cantones:', error);
       const fallbackList = FALLBACK_GEOGRAPHY.cantones[provinciaId] || [];
       setCantones(fallbackList);
-      if (fallbackList.length > 0) {
-        setSelectedCanton(fallbackList[0].id);
-      }
     } finally {
       setIsLoadingGeo(false);
     }
@@ -292,16 +284,10 @@ export default function CitizenDashboard({ user, onLogout }) {
       }));
 
       setDistritos(mapped);
-      if (mapped.length > 0) {
-        setSelectedDistrito(mapped[0].id);
-      }
     } catch (error) {
       console.warn('Using local fallback for Distritos:', error);
       const fallbackList = FALLBACK_GEOGRAPHY.distritos[cantonId] || [];
       setDistritos(fallbackList);
-      if (fallbackList.length > 0) {
-        setSelectedDistrito(fallbackList[0].id);
-      }
     } finally {
       setIsLoadingGeo(false);
     }
@@ -336,6 +322,11 @@ export default function CitizenDashboard({ user, onLogout }) {
 
   // Simulated Map Actions
   const handleMapClick = (e) => {
+    if (!selectedProvincia || !selectedCanton || !selectedDistrito) {
+      setFormError('Por favor seleccione la Provincia, Cantón y Distrito antes de marcar en el mapa.');
+      return;
+    }
+    setFormError('');
     if (!mapRef.current) return;
     const rect = mapRef.current.getBoundingClientRect();
     const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
@@ -352,6 +343,11 @@ export default function CitizenDashboard({ user, onLogout }) {
   };
 
   const handleUseGPS = () => {
+    if (!selectedProvincia || !selectedCanton || !selectedDistrito) {
+      setFormError('Por favor seleccione la Provincia, Cantón y Distrito antes de usar el GPS.');
+      return;
+    }
+    setFormError('');
     const randomX = Math.floor(Math.random() * 60) + 20;
     const randomY = Math.floor(Math.random() * 60) + 20;
     setMapCoordinates({ x: randomX, y: randomY });
@@ -652,7 +648,7 @@ export default function CitizenDashboard({ user, onLogout }) {
         {showForm ? (
           <section className="form-section card animate-slide-up">
             <div className="card-header">
-              <h3>Crear Nuevo Reporte (API Geo-CR Integrada)</h3>
+              <h3>Crear Nuevo Reporte</h3>
               <p>Por favor complete los campos obligatorios indicados con <span style={{ color: 'var(--danger)', fontWeight: 'bold' }}>*</span></p>
             </div>
             
@@ -698,6 +694,7 @@ export default function CitizenDashboard({ user, onLogout }) {
                     onChange={(e) => setSelectedProvincia(e.target.value)}
                     disabled={isLoadingGeo && provincias.length === 0}
                   >
+                    <option value="">Seleccione Provincia...</option>
                     {provincias.map((p) => (
                       <option key={p.id} value={p.id}>{p.nombre}</option>
                     ))}
@@ -710,7 +707,7 @@ export default function CitizenDashboard({ user, onLogout }) {
                     id="geo-cant"
                     value={selectedCanton}
                     onChange={(e) => setSelectedCanton(e.target.value)}
-                    disabled={cantones.length === 0}
+                    disabled={!selectedProvincia || cantones.length === 0}
                   >
                     <option value="">Seleccione Cantón...</option>
                     {cantones.map((c) => (
@@ -725,7 +722,7 @@ export default function CitizenDashboard({ user, onLogout }) {
                     id="geo-dist"
                     value={selectedDistrito}
                     onChange={(e) => setSelectedDistrito(e.target.value)}
-                    disabled={distritos.length === 0}
+                    disabled={!selectedCanton || distritos.length === 0}
                   >
                     <option value="">Seleccione Distrito...</option>
                     {distritos.map((d) => (

@@ -82,6 +82,11 @@ export default function Auth({ onLoginSuccess }) {
       setPassword('campo123');
       setActiveTab('municipal');
       setIsRegister(false);
+    } else if (role === 'poc_ciudadano') {
+      setEmail('ciudadano@ejemplo.com');
+      setPassword('ciudadano123');
+      setActiveTab('citizen');
+      setIsRegister(false);
     }
   };
 
@@ -244,6 +249,14 @@ export default function Auth({ onLoginSuccess }) {
               onClick={() => autofillDemo('campo')}
             >
               🔑 Personal de Campo
+            </button>
+            <button
+              type="button"
+              className="demo-badge"
+              onClick={() => autofillDemo('poc_ciudadano')}
+              style={{ border: '1px solid var(--primary)', color: 'var(--primary)', fontWeight: 'bold' }}
+            >
+              🚀 Ciudadano PoC
             </button>
           </div>
         </div>

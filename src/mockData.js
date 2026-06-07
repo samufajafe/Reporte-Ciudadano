@@ -13,6 +13,12 @@ export const DEFAULT_USERS = [
     name: 'Carlos Mendoza',
     role: 'personal_campo',
     department: 'Mantenimiento de Vías'
+  },
+  {
+    email: 'ciudadano@ejemplo.com',
+    password: 'ciudadano123',
+    name: 'Usuario PoC (Ciudadano)',
+    role: 'ciudadano'
   }
 ];
 
@@ -82,6 +88,23 @@ const INITIAL_REPORTS = [
 export const initStorage = () => {
   if (!localStorage.getItem('rc_users')) {
     localStorage.setItem('rc_users', JSON.stringify(DEFAULT_USERS));
+  } else {
+    // Asegurar que los usuarios por defecto (incluido el nuevo usuario PoC) existan en localStorage
+    try {
+      const users = JSON.parse(localStorage.getItem('rc_users'));
+      let updated = false;
+      DEFAULT_USERS.forEach(defUser => {
+        if (!users.some(u => u.email.toLowerCase() === defUser.email.toLowerCase())) {
+          users.push(defUser);
+          updated = true;
+        }
+      });
+      if (updated) {
+        localStorage.setItem('rc_users', JSON.stringify(users));
+      }
+    } catch (e) {
+      console.error('Error updating default users:', e);
+    }
   }
   if (!localStorage.getItem('rc_reports')) {
     localStorage.setItem('rc_reports', JSON.stringify(INITIAL_REPORTS));
