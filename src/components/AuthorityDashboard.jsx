@@ -516,17 +516,7 @@ export default function AuthorityDashboard({ user, onLogout }) {
             </button>
 
             {showAlertDropdown && (
-              <div className="card" style={{
-                position: 'absolute',
-                top: '50px',
-                right: '0',
-                width: '350px',
-                maxHeight: '400px',
-                overflowY: 'auto',
-                zIndex: 1000,
-                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-                padding: 0
-              }}>
+              <div className="notification-dropdown authority-dropdown card">
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',

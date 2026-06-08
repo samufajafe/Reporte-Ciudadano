@@ -1154,4 +1154,40 @@
   }
 }
 
+/* Menú Desplegable de Notificaciones y Alertas */
+.notification-dropdown {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 320px;
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0;
+}
+
+/* El menú de la Autoridad Municipal es un poco más ancho */
+.notification-dropdown.authority-dropdown {
+  width: 350px;
+}
+
+/* Ajustes Responsivos para Pantallas Móviles */
+@media (max-width: 600px) {
+  .notification-dropdown {
+    right: auto;
+    left: 0;
+    width: calc(100vw - 32px); /* Deja un margen de 16px a cada lado */
+    max-width: 320px;
+  }
+
+  .notification-dropdown.authority-dropdown {
+    max-width: 350px;
+  }
+}
+
+
 

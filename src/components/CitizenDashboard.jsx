@@ -513,14 +513,6 @@ export default function CitizenDashboard({ user, onLogout }) {
 
             {showNotifDropdown && (
               <div className="notification-dropdown card" style={{
-                position: 'absolute',
-                top: '50px',
-                right: '0',
-                width: '320px',
-                maxHeight: '400px',
-                overflowY: 'auto',
-                zIndex: 1000,
-                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
                 animation: 'fade-in 0.2s ease'
               }}>
                 <div className="dropdown-header" style={{

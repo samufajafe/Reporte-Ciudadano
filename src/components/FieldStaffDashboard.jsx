@@ -221,16 +221,7 @@ export default function FieldStaffDashboard({ user, onLogout }) {
             </button>
 
             {showNotifDropdown && (
-              <div className="card" style={{
-                position: 'absolute',
-                top: '50px',
-                right: '0',
-                width: '320px',
-                maxHeight: '400px',
-                overflowY: 'auto',
-                zIndex: 1000,
-                boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
-              }}>
+              <div className="notification-dropdown card">
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
