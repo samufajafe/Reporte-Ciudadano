@@ -260,6 +260,9 @@ export default function Auth({ onLoginSuccess }) {
             </button>
           </div>
         </div>
+        <p className="auth-footer-text" style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '24px', marginBottom: '0', opacity: '0.7' }}>
+          © 2026 Municipalidad de Reporte Ciudadano.
+        </p>
       </div>
     </div>
   );

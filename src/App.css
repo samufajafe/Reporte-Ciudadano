@@ -67,6 +67,14 @@
   padding: 40px 24px;
 }
 
+.app-main-content.auth-layout {
+  padding: 0 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 72px);
+}
+
 /* Authentication Screen */
 .auth-container {
   display: flex;
@@ -301,7 +309,10 @@
 /* Slide-over Drawer Overlay & Panel styling */
 .drawer-overlay {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background-color: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -1186,6 +1197,94 @@
 
   .notification-dropdown.authority-dropdown {
     max-width: 350px;
+  }
+}
+
+/* Ajustes Responsivos de Altura y Ancho para Login en Laptops y Móviles */
+@media (max-width: 768px), (max-height: 850px) {
+  .auth-container {
+    min-height: auto;
+    padding: 10px;
+  }
+  
+  .auth-card {
+    padding: 24px;
+    max-width: 440px;
+    margin: 10px auto;
+  }
+  
+  .auth-header {
+    margin-bottom: 16px;
+  }
+  
+  .brand-logo {
+    font-size: 38px;
+    margin-bottom: 8px;
+  }
+  
+  .auth-header h2 {
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+  
+  .auth-header .subtitle {
+    font-size: 13px;
+  }
+  
+  .auth-tabs {
+    margin-bottom: 16px;
+    padding: 4px;
+  }
+  
+  .tab-btn {
+    padding: 8px;
+    font-size: 13px;
+  }
+  
+  .auth-form h3 {
+    font-size: 18px;
+  }
+  
+  .auth-form .form-helper {
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+  
+  .form-group {
+    margin-bottom: 12px;
+  }
+  
+  .form-group label {
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  
+  .auth-card input {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  
+  .toggle-auth {
+    margin-top: 16px;
+  }
+  
+  .demo-credentials {
+    margin-top: 20px;
+    padding-top: 14px;
+  }
+  
+  .demo-title {
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  
+  .demo-buttons {
+    gap: 8px;
+  }
+  
+  .demo-badge {
+    padding: 4px 10px;
+    font-size: 11px;
   }
 }
 

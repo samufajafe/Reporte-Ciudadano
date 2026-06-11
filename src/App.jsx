@@ -76,14 +76,16 @@ function App() {
         )}
       </nav>
       
-      <div className="app-main-content">
+      <div className={`app-main-content ${!currentUser ? 'auth-layout' : ''}`}>
         {renderDashboard()}
       </div>
 
-      <footer className="main-footer">
-        <p>© 2026 Municipalidad de Reporte Ciudadano. Todos los derechos reservados.</p>
-        <p className="footer-sub">Diseñado para la Transparencia y Eficiencia en la Gestión de Servicios Comunitarios.</p>
-      </footer>
+      {currentUser && (
+        <footer className="main-footer">
+          <p>© 2026 Municipalidad de Reporte Ciudadano. Todos los derechos reservados.</p>
+          <p className="footer-sub">Diseñado para la Transparencia y Eficiencia en la Gestión de Servicios Comunitarios.</p>
+        </footer>
+      )}
     </>
   );
 }
