@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getReports, getUsers, assignReport, closeReport, rejectReport, updateReportStatusByAuthority, CATEGORIES, PRIORITIES, STATUSES, getAuthorityAlerts, markAuthorityAlertRead, markAllAuthorityAlertsRead, disableReportAlerts, checkAndGenerateInactivityAlerts, returnReportToFieldStaff } from '../mockData';
+import { getReports, getUsers, assignReport, closeReport, rejectReport, updateReportStatusByAuthority, CATEGORIES, PRIORITIES, STATUSES, getAuthorityAlerts, markAuthorityAlertRead, markAllAuthorityAlertsRead, disableReportAlerts, checkAndGenerateInactivityAlerts, returnReportToFieldStaff, updateReportPriority } from '../mockData';
+import { MapPreview, AuthorityMap } from './MapComponents';
 
 export default function AuthorityDashboard({ user, onLogout }) {
   const [reports, setReports] = useState([]);
@@ -89,6 +90,36 @@ export default function AuthorityDashboard({ user, onLogout }) {
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err) {
       setActionError(err.message || 'Error al devolver el reporte al personal de campo.');
+    }
+  };
+
+  // Dynamic Map Visual States
+  const [showMarkers, setShowMarkers] = useState(true);
+  const [showHeat, setShowHeat] = useState(true);
+  const [heatRadius, setHeatRadius] = useState(25);
+  const [heatBlur, setHeatBlur] = useState(15);
+
+  // Priority assignment states & logic
+  const [authorityNewPriority, setAuthorityNewPriority] = useState('medium');
+
+  useEffect(() => {
+    if (selectedReport) {
+      setAuthorityNewPriority(selectedReport.priority || 'medium');
+    }
+  }, [selectedReport]);
+
+  const handleAuthorityPriorityChange = (e) => {
+    e.preventDefault();
+    setActionError('');
+    setActionSuccess('');
+    try {
+      const updated = updateReportPriority(selectedReport.id, authorityNewPriority);
+      setActionSuccess('¡La prioridad del reporte ha sido actualizada exitosamente!');
+      setSelectedReport(updated);
+      loadData();
+      setTimeout(() => setActionSuccess(''), 3000);
+    } catch (err) {
+      setActionError(err.message || 'Error al actualizar la prioridad.');
     }
   };
 
@@ -902,23 +933,7 @@ export default function AuthorityDashboard({ user, onLogout }) {
                 {selectedReport.coordinates && (
                   <div className="detail-section">
                     <h4>Geolocalización en Mapa</h4>
-                    <div className="map-mock-container static-preview">
-                      <div className="map-grid-bg">
-                        <div className="map-street h-street-1"></div>
-                        <div className="map-street h-street-2"></div>
-                        <div className="map-street v-street-1"></div>
-                        <div className="map-street v-street-2"></div>
-                        <div className="map-neighborhood block-a">Parque</div>
-                        <div className="map-neighborhood block-b">Zona Residencial</div>
-                        <div className="map-neighborhood block-c">Municipalidad</div>
-                      </div>
-                      <div
-                        className="map-marker-pin animate-pulse"
-                        style={{ left: `${selectedReport.coordinates.x}%`, top: `${selectedReport.coordinates.y}%` }}
-                      >
-                        📍
-                      </div>
-                    </div>
+                    <MapPreview coordinates={selectedReport.coordinates} />
                   </div>
                 )}
 
@@ -1111,7 +1126,7 @@ export default function AuthorityDashboard({ user, onLogout }) {
                 {/* Manual Status Changer (Only if not closed or rejected) */}
                 {selectedReport.status !== 'closed' && selectedReport.status !== 'rejected' && !showRejectForm && (
                   <div className="detail-section manual-status-box" style={{ padding: '16px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginBottom: '20px', textAlign: 'left' }}>
-                    <h4 style={{ fontSize: '14px', margin: '0 0 8px 0' }}>⚙️ Cambiar Estado Manualmente</h4>
+                    <h4 style={{ fontSize: '14px', margin: '0 0 8px 0' }}>⚙️ Cambiar Estado Manuelmente</h4>
                     <form onSubmit={handleAuthorityStatusChange} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div className="form-group" style={{ marginBottom: 0 }}>
                         <select
@@ -1154,6 +1169,30 @@ export default function AuthorityDashboard({ user, onLogout }) {
                       )}
                       <button type="submit" className="btn btn-secondary btn-sm" style={{ width: '100%' }}>
                         Actualizar Estado
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {/* Priority Changer (Only if not closed or rejected) */}
+                {selectedReport.status !== 'closed' && selectedReport.status !== 'rejected' && !showRejectForm && (
+                  <div className="detail-section manual-status-box" style={{ padding: '16px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginBottom: '20px', textAlign: 'left' }}>
+                    <h4 style={{ fontSize: '14px', margin: '0 0 8px 0' }}>⚡ Asignar Prioridad (Urgencia)</h4>
+                    <form onSubmit={handleAuthorityPriorityChange} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <select
+                          value={authorityNewPriority}
+                          onChange={(e) => setAuthorityNewPriority(e.target.value)}
+                          required
+                          style={{ width: '100%', padding: '6px' }}
+                        >
+                          {PRIORITIES.map((p) => (
+                            <option key={p.value} value={p.value}>{p.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button type="submit" className="btn btn-secondary btn-sm" style={{ width: '100%' }}>
+                        Actualizar Prioridad
                       </button>
                     </form>
                   </div>
@@ -1457,127 +1496,99 @@ export default function AuthorityDashboard({ user, onLogout }) {
               {/* Heat Map Card */}
               <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
                 <div className="card-header" style={{ paddingBottom: '10px', borderBottom: '1px solid var(--border)' }}>
-                  <h3 style={{ margin: 0 }}>🗺️ Mapa de Calor de Incidencias</h3>
+                  <h3 style={{ margin: 0 }}>🗺️ Mapa Real de Incidencias y Calor</h3>
                   <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                    Visualice la concentración de reportes por cuadrantes. Haga clic en una zona para ver la lista de casos detallada.
+                    Visualice la ubicación exacta y concentración de los reportes. Haga clic en un pin para ver detalles y gestionarlo.
                   </p>
                 </div>
 
-                <div className="map-mock-container" style={{ position: 'relative', width: '100%', height: '380px', cursor: 'default', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
-                  <div className="map-grid-bg">
-                    <div className="map-street h-street-1"></div>
-                    <div className="map-street h-street-2"></div>
-                    <div className="map-street v-street-1"></div>
-                    <div className="map-street v-street-2"></div>
-                    <div className="map-neighborhood block-a">Parque</div>
-                    <div className="map-neighborhood block-b">Zona Residencial</div>
-                    <div className="map-neighborhood block-c">Municipalidad</div>
+                {/* Control Panel for Heatmap/Markers Options */}
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '16px',
+                  padding: '12px',
+                  backgroundColor: 'var(--bg-main, #f9fafb)',
+                  borderRadius: 'var(--radius-sm, 6px)',
+                  border: '1px solid var(--border, #e5e7eb)',
+                  fontSize: '13px',
+                  marginBottom: '10px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500', cursor: 'pointer', margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={showMarkers}
+                        onChange={(e) => setShowMarkers(e.target.checked)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      📍 Mostrar Marcadores
+                    </label>
                   </div>
                   
-                  {/* Heat map cells grid */}
-                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gridTemplateRows: 'repeat(5, 1fr)', zIndex: 5 }}>
-                    {Array(5).fill(null).map((_, rowIdx) => (
-                      Array(5).fill(null).map((_, colIdx) => {
-                        const count = heatGrid[rowIdx][colIdx];
-                        let bgColor = 'transparent';
-                        if (count > 0) {
-                          const intensity = count / maxCount;
-                          // Heat gradient: light orange/yellow to strong red
-                          const r = Math.round(245 + (239 - 245) * intensity);
-                          const g = Math.round(220 + (68 - 220) * intensity);
-                          const b = Math.round(110 + (68 - 110) * intensity);
-                          bgColor = `rgba(${r}, ${g}, ${b}, ${0.25 + intensity * 0.45})`;
-                        }
-                        const isSelected = selectedCell && selectedCell.row === rowIdx && selectedCell.col === colIdx;
-
-                        return (
-                          <div
-                            key={`${rowIdx}-${colIdx}`}
-                            onClick={() => setSelectedCell({ row: rowIdx, col: colIdx })}
-                            style={{
-                              backgroundColor: bgColor,
-                              border: isSelected ? '2px solid var(--primary)' : '1px dashed rgba(255, 255, 255, 0.1)',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: count > 0 ? '#ffffff' : 'transparent',
-                              fontWeight: 'bold',
-                              fontSize: '13px',
-                              textShadow: count > 0 ? '0 1px 3px rgba(0,0,0,0.8)' : 'none'
-                            }}
-                            title={`${count} reportes en este cuadrante`}
-                          >
-                            {count > 0 && <span>{count}</span>}
-                          </div>
-                        );
-                      })
-                    ))}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500', cursor: 'pointer', margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={showHeat}
+                        onChange={(e) => setShowHeat(e.target.checked)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      🔥 Mostrar Capa de Calor
+                    </label>
                   </div>
+
+                  {showHeat && (
+                    <div style={{ display: 'flex', gap: '16px', flex: 1, minWidth: '250px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: 'var(--text-muted, #6b7280)' }}>Radio:</span>
+                        <input
+                          type="range"
+                          min="10"
+                          max="50"
+                          value={heatRadius}
+                          onChange={(e) => setHeatRadius(Number(e.target.value))}
+                          style={{ width: '80px', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontWeight: '600' }}>{heatRadius}px</span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: 'var(--text-muted, #6b7280)' }}>Difuminado:</span>
+                        <input
+                          type="range"
+                          min="10"
+                          max="40"
+                          value={heatBlur}
+                          onChange={(e) => setHeatBlur(Number(e.target.value))}
+                          style={{ width: '80px', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontWeight: '600' }}>{heatBlur}px</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Quadrant Report List */}
-                {selectedCell && (
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '15px', marginTop: '10px' }} className="animate-fade-in">
-                    <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--primary)' }}>
-                      📍 Reportes en Cuadrante ({selectedCell.row + 1}, {selectedCell.col + 1})
-                    </h4>
-                    {reportsInCell.length === 0 ? (
-                      <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                        No hay reportes registrados en este cuadrante para el período y filtros actuales.
-                      </p>
-                    ) : (
-                      <div className="reports-table-wrapper" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                        <table className="reports-table" style={{ fontSize: '12px' }}>
-                          <thead>
-                            <tr>
-                              <th>Código</th>
-                              <th>Incidencia</th>
-                              <th>Categoría</th>
-                              <th>Fecha</th>
-                              <th>Estado</th>
-                              <th>Acción</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {reportsInCell.map(r => (
-                              <tr key={r.id}>
-                                <td data-label="Código"><span className="code-tag">{r.id}</span></td>
-                                <td data-label="Incidencia"><strong>{r.title}</strong></td>
-                                <td data-label="Categoría">{getCategoryIcon(r.category)}</td>
-                                <td data-label="Fecha">{new Date(r.createdAt).toLocaleDateString('es-CR')}</td>
-                                <td data-label="Estado">{getStatusBadge(r.status)}</td>
-                                <td data-label="Acciones">
-                                  <button
-                                    type="button"
-                                    className="btn btn-secondary btn-xs"
-                                    onClick={() => {
-                                      setSelectedReport(r);
-                                      setActiveTab('inbox');
-                                      setClosureComment('');
-                                      setClosureImage(null);
-                                      setEstimatedDate(r.estimatedDate || '');
-                                      setReassignReason('');
-                                      setRejectReason('');
-                                      setSelectedRejectReason('fuera_jurisdiccion');
-                                      setCustomRejectReason('');
-                                      setManualClosureImage(null);
-                                      setShowRejectForm(false);
-                                    }}
-                                    style={{ padding: '3px 8px', fontSize: '11px' }}
-                                  >
-                                    🔎 Gestionar
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <AuthorityMap
+                  reports={filteredStatsReports}
+                  showMarkers={showMarkers}
+                  showHeat={showHeat}
+                  heatRadius={heatRadius}
+                  heatBlur={heatBlur}
+                  onSelectReport={(rep) => {
+                    setSelectedReport(rep);
+                    setActiveTab('inbox');
+                    setClosureComment('');
+                    setClosureImage(null);
+                    setEstimatedDate(rep.estimatedDate || '');
+                    setReassignReason('');
+                    setRejectReason('');
+                    setSelectedRejectReason('fuera_jurisdiccion');
+                    setCustomRejectReason('');
+                    setManualClosureImage(null);
+                    setShowRejectForm(false);
+                  }}
+                />
               </section>
 
               {/* Frequencies Card */}

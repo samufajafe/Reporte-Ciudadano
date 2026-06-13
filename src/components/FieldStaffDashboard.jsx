@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getReports, updateReportStatus, CATEGORIES, PRIORITIES, STATUSES, getNotifications, markNotificationRead, markAllNotificationsRead, resolveReportByFieldStaff, reportImpossibilityByFieldStaff } from '../mockData';
+import { MapPreview } from './MapComponents';
 
 export default function FieldStaffDashboard({ user, onLogout }) {
   const [reports, setReports] = useState([]);
@@ -471,23 +472,7 @@ export default function FieldStaffDashboard({ user, onLogout }) {
                 {selectedReport.coordinates && (
                   <div className="detail-section">
                     <h4>Geolocalización en Mapa</h4>
-                    <div className="map-mock-container static-preview">
-                      <div className="map-grid-bg">
-                        <div className="map-street h-street-1"></div>
-                        <div className="map-street h-street-2"></div>
-                        <div className="map-street v-street-1"></div>
-                        <div className="map-street v-street-2"></div>
-                        <div className="map-neighborhood block-a">Parque</div>
-                        <div className="map-neighborhood block-b">Zona Residencial</div>
-                        <div className="map-neighborhood block-c">Municipalidad</div>
-                      </div>
-                      <div
-                        className="map-marker-pin animate-pulse"
-                        style={{ left: `${selectedReport.coordinates.x}%`, top: `${selectedReport.coordinates.y}%` }}
-                      >
-                        📍
-                      </div>
-                    </div>
+                    <MapPreview coordinates={selectedReport.coordinates} />
                   </div>
                 )}
 
