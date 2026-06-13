@@ -82,6 +82,11 @@ export default function Auth({ onLoginSuccess }) {
       setPassword('campo123');
       setActiveTab('municipal');
       setIsRegister(false);
+    } else if (role === 'poc_ciudadano') {
+      setEmail('ciudadano@ejemplo.com');
+      setPassword('ciudadano123');
+      setActiveTab('citizen');
+      setIsRegister(false);
     }
   };
 
@@ -245,8 +250,19 @@ export default function Auth({ onLoginSuccess }) {
             >
               🔑 Personal de Campo
             </button>
+            <button
+              type="button"
+              className="demo-badge"
+              onClick={() => autofillDemo('poc_ciudadano')}
+              style={{ border: '1px solid var(--primary)', color: 'var(--primary)', fontWeight: 'bold' }}
+            >
+              🚀 Ciudadano PoC
+            </button>
           </div>
         </div>
+        <p className="auth-footer-text" style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', marginTop: '24px', marginBottom: '0', opacity: '0.7' }}>
+          © 2026 Municipalidad de Reporte Ciudadano.
+        </p>
       </div>
     </div>
   );

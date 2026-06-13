@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getReports, updateReportStatus, CATEGORIES, PRIORITIES, STATUSES, getNotifications, markNotificationRead, markAllNotificationsRead } from '../mockData';
+import { getReports, updateReportStatus, CATEGORIES, PRIORITIES, STATUSES, getNotifications, markNotificationRead, markAllNotificationsRead, resolveReportByFieldStaff, reportImpossibilityByFieldStaff } from '../mockData';
+import { MapPreview } from './MapComponents';
 
 export default function FieldStaffDashboard({ user, onLogout }) {
   const [reports, setReports] = useState([]);
@@ -10,9 +11,17 @@ export default function FieldStaffDashboard({ user, onLogout }) {
   const [note, setNote] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
   const [actionError, setActionError] = useState('');
+  
+  // Resolution evidence states
+  const [resolutionImages, setResolutionImages] = useState([]);
+  
+  // Impossibility states
+  const [showImpossibilityForm, setShowImpossibilityForm] = useState(false);
+  const [impossibilityReason, setImpossibilityReason] = useState('');
 
   // Notification states
   const [notifications, setNotifications] = useState([]);
+  const [zoomedImage, setZoomedImage] = useState(null);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
   useEffect(() => {
@@ -53,6 +62,32 @@ export default function FieldStaffDashboard({ user, onLogout }) {
     setReports(assigned);
   };
 
+  const handleResolutionImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    setActionError('');
+    if (resolutionImages.length + files.length > 5) {
+      setActionError('No puede adjuntar más de 5 fotografías de resolución.');
+      return;
+    }
+
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setResolutionImages((prev) => {
+          if (prev.length >= 5) return prev;
+          return [...prev, reader.result];
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeResolutionImage = (idx) => {
+    setResolutionImages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const handleUpdateStatus = (e) => {
     e.preventDefault();
     if (!selectedReport) return;
@@ -60,20 +95,53 @@ export default function FieldStaffDashboard({ user, onLogout }) {
     setActionSuccess('');
     setActionError('');
 
+    if (newStatus === 'resolved') {
+      if (resolutionImages.length === 0) {
+        setActionError('Debe adjuntar al menos una fotografía de evidencia de la resolución.');
+        return;
+      }
+      try {
+        const updated = resolveReportByFieldStaff(selectedReport.id, note, resolutionImages);
+        setActionSuccess('¡El reporte ha sido marcado como Resuelto y enviado a revisión!');
+        setNote('');
+        setResolutionImages([]);
+        setSelectedReport(updated);
+        loadReports();
+        setTimeout(() => setActionSuccess(''), 3000);
+      } catch (err) {
+        setActionError(err.message || 'Error al resolver el reporte.');
+      }
+    } else {
+      try {
+        const updated = updateReportStatus(selectedReport.id, newStatus, note);
+        setActionSuccess('¡El estado de la incidencia ha sido actualizado exitosamente!');
+        setNote('');
+        setSelectedReport(updated);
+        loadReports();
+        setTimeout(() => setActionSuccess(''), 3000);
+      } catch (err) {
+        setActionError(err.message || 'Ocurrió un error al actualizar el estado de la incidencia.');
+      }
+    }
+  };
+
+  const handleImpossibilitySubmit = (e) => {
+    e.preventDefault();
+    if (!selectedReport || !impossibilityReason.trim()) return;
+
+    setActionSuccess('');
+    setActionError('');
+
     try {
-      const updated = updateReportStatus(selectedReport.id, newStatus, note);
-      setActionSuccess('¡El estado de la incidencia ha sido actualizado exitosamente!');
-      
-      // Clear notes input and update local lists
-      setNote('');
+      const updated = reportImpossibilityByFieldStaff(selectedReport.id, impossibilityReason);
+      setActionSuccess('Se ha notificado la imposibilidad de resolución a la autoridad.');
+      setImpossibilityReason('');
+      setShowImpossibilityForm(false);
       setSelectedReport(updated);
       loadReports();
-
-      setTimeout(() => {
-        setActionSuccess('');
-      }, 3000);
+      setTimeout(() => setActionSuccess(''), 3000);
     } catch (err) {
-      setActionError('Ocurrió un error al actualizar el estado de la incidencia.');
+      setActionError(err.message || 'Error al reportar imposibilidad.');
     }
   };
 
@@ -154,16 +222,7 @@ export default function FieldStaffDashboard({ user, onLogout }) {
             </button>
 
             {showNotifDropdown && (
-              <div className="card" style={{
-                position: 'absolute',
-                top: '50px',
-                right: '0',
-                width: '320px',
-                maxHeight: '400px',
-                overflowY: 'auto',
-                zIndex: 1000,
-                boxShadow: '0 10px 25px rgba(0,0,0,0.15)'
-              }}>
+              <div className="notification-dropdown card">
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -319,17 +378,17 @@ export default function FieldStaffDashboard({ user, onLogout }) {
                         key={rep.id}
                         className={selectedReport?.id === rep.id ? 'row-selected' : ''}
                       >
-                        <td><span className="code-tag">{rep.id}</span></td>
-                        <td>
+                        <td data-label="Código"><span className="code-tag">{rep.id}</span></td>
+                        <td data-label="Incidencia">
                           <div className="table-report-info">
                             <strong>{rep.title}</strong>
                             <span className="text-muted truncate-text">📍 {rep.location}</span>
                           </div>
                         </td>
-                        <td>{getCategoryIcon(rep.category)}</td>
-                        <td>{getPriorityBadge(rep.priority)}</td>
-                        <td>{getStatusBadge(rep.status)}</td>
-                        <td>
+                        <td data-label="Categoría">{getCategoryIcon(rep.category)}</td>
+                        <td data-label="Urgencia">{getPriorityBadge(rep.priority)}</td>
+                        <td data-label="Estado">{getStatusBadge(rep.status)}</td>
+                        <td data-label="Acciones">
                           <button
                             type="button"
                             className="btn btn-secondary btn-xs"
@@ -348,10 +407,12 @@ export default function FieldStaffDashboard({ user, onLogout }) {
               </div>
             )}
           </section>
+        </div>
 
-          {/* Action and Resolution Details */}
-          {selectedReport && (
-            <section className="report-detail-section card animate-fade-in">
+        {/* Action and Resolution Details Drawer Overlay */}
+        {selectedReport && (
+          <div className="drawer-overlay" onClick={() => setSelectedReport(null)}>
+            <section className="report-detail-section card drawer-panel animate-fade-in" onClick={(e) => e.stopPropagation()}>
               <div className="card-header detail-header">
                 <div>
                   <span className="code-tag">{selectedReport.id}</span>
@@ -399,7 +460,7 @@ export default function FieldStaffDashboard({ user, onLogout }) {
                     <h4>Evidencias Fotográficas Cargadas</h4>
                     <div className="detail-images-gallery">
                       {selectedReport.images.map((img, idx) => (
-                        <div key={idx} className="gallery-img-container">
+                        <div key={idx} className="gallery-img-container" style={{ cursor: 'zoom-in' }} onClick={() => setZoomedImage(img)}>
                           <img src={img} alt={`Evidencia ${idx}`} className="gallery-img" />
                         </div>
                       ))}
@@ -411,23 +472,7 @@ export default function FieldStaffDashboard({ user, onLogout }) {
                 {selectedReport.coordinates && (
                   <div className="detail-section">
                     <h4>Geolocalización en Mapa</h4>
-                    <div className="map-mock-container static-preview">
-                      <div className="map-grid-bg">
-                        <div className="map-street h-street-1"></div>
-                        <div className="map-street h-street-2"></div>
-                        <div className="map-street v-street-1"></div>
-                        <div className="map-street v-street-2"></div>
-                        <div className="map-neighborhood block-a">Parque</div>
-                        <div className="map-neighborhood block-b">Zona Residencial</div>
-                        <div className="map-neighborhood block-c">Municipalidad</div>
-                      </div>
-                      <div
-                        className="map-marker-pin animate-pulse"
-                        style={{ left: `${selectedReport.coordinates.x}%`, top: `${selectedReport.coordinates.y}%` }}
-                      >
-                        📍
-                      </div>
-                    </div>
+                    <MapPreview coordinates={selectedReport.coordinates} />
                   </div>
                 )}
 
@@ -437,39 +482,127 @@ export default function FieldStaffDashboard({ user, onLogout }) {
                 </div>
 
                 {/* Progress Update Form */}
-                <div className="detail-section update-status-box">
-                  <h4>Actualizar Estado de la Incidencia</h4>
-                  <form onSubmit={handleUpdateStatus} className="status-update-form">
-                    <div className="form-group">
-                      <label htmlFor="new-status-select">Nuevo Estado de Trabajo:</label>
-                      <select
-                        id="new-status-select"
-                        value={newStatus}
-                        onChange={(e) => setNewStatus(e.target.value)}
+                {['resolved', 'closed', 'rejected'].includes(selectedReport.status) ? (
+                  <div className="alert alert-info" style={{ marginTop: '20px', textAlign: 'left' }}>
+                    <strong>ℹ️ Estado: {STATUSES.find(s => s.value === selectedReport.status)?.label || selectedReport.status}</strong>
+                    <p style={{ margin: '5px 0 0 0', fontSize: '13px', lineHeight: '1.4' }}>
+                      {selectedReport.status === 'resolved' 
+                        ? 'Este reporte ha sido marcado como Resuelto y está en espera de la revisión y cierre formal por parte de la autoridad municipal.'
+                        : 'Este reporte está cerrado o rechazado y no admite modificaciones.'}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="detail-section update-status-box">
+                      <h4>Actualizar Estado de la Incidencia</h4>
+                      <form onSubmit={handleUpdateStatus} className="status-update-form">
+                        <div className="form-group">
+                          <label htmlFor="new-status-select">Nuevo Estado de Trabajo:</label>
+                          <select
+                            id="new-status-select"
+                            value={newStatus}
+                            onChange={(e) => setNewStatus(e.target.value)}
+                          >
+                            <option value="assigned">Asignado (Sin Empezar)</option>
+                            <option value="in_progress">👷 En Progreso / Ejecución</option>
+                            <option value="resolved">✅ Resuelto / Solucionado</option>
+                          </select>
+                        </div>
+
+                        {newStatus === 'resolved' && (
+                          <div className="form-group" style={{ borderTop: '1px solid var(--border)', paddingTop: '15px', marginTop: '15px' }}>
+                            <label>Fotos de Evidencia de Resolución <span style={{ color: 'var(--danger)' }}>*</span></label>
+                            <p className="form-helper" style={{ margin: '0 0 10px 0' }}>Cargue entre 1 y 5 fotografías que demuestren el trabajo finalizado.</p>
+                            <div className="image-upload-zone" style={{ padding: '15px', border: '1px dashed var(--border)', borderRadius: '4px', textAlign: 'center', cursor: 'pointer', background: 'var(--bg-main)' }}>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={handleResolutionImageChange}
+                                style={{ display: 'none' }}
+                                id="resolution-photos"
+                              />
+                              <label htmlFor="resolution-photos" style={{ cursor: 'pointer', display: 'block', fontSize: '13px', color: 'var(--text-muted)' }}>
+                                📷 Seleccionar fotos de resolución
+                              </label>
+                            </div>
+                            {resolutionImages.length > 0 && (
+                              <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+                                {resolutionImages.map((img, idx) => (
+                                  <div key={idx} style={{ position: 'relative', width: '60px', height: '45px', borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                                    <img src={img} alt="resolucion" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <button
+                                      type="button"
+                                      onClick={() => removeResolutionImage(idx)}
+                                      style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(239, 68, 68, 0.8)', color: 'white', border: 'none', width: '16px', height: '16px', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                    >
+                                      ✖
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="form-group">
+                          <label htmlFor="status-note">Notas de Trabajo / Bitácora:</label>
+                          <textarea
+                            id="status-note"
+                            rows="3"
+                            placeholder="Describe las acciones realizadas para solucionar el problema (materiales, personal, avance)..."
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            required
+                          ></textarea>
+                        </div>
+
+                        <button type="submit" className="btn btn-primary btn-block">
+                          Guardar Avance
+                        </button>
+                      </form>
+                    </div>
+
+                    {!showImpossibilityForm ? (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-block"
+                        onClick={() => {
+                          setShowImpossibilityForm(true);
+                          setImpossibilityReason('');
+                        }}
+                        style={{ marginTop: '15px', borderColor: 'var(--danger)', color: 'var(--danger)', background: 'transparent' }}
                       >
-                        <option value="assigned">Asignado (Sin Empezar)</option>
-                        <option value="in_progress">👷 En Progreso / Ejecución</option>
-                        <option value="resolved">✅ Resuelto / Solucionado</option>
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor="status-note">Notas de Trabajo / Bitácora:</label>
-                      <textarea
-                        id="status-note"
-                        rows="3"
-                        placeholder="Describe las acciones realizadas para solucionar el problema (materiales, personal, avance)..."
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        required
-                      ></textarea>
-                    </div>
-
-                    <button type="submit" className="btn btn-primary btn-block">
-                      Guardar Avance
-                    </button>
-                  </form>
-                </div>
+                        ⚠️ Declarar Imposibilidad de Resolución
+                      </button>
+                    ) : (
+                      <div className="detail-section update-status-box animate-fade-in" style={{ border: '1px solid rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.03)', marginTop: '15px' }}>
+                        <h4 style={{ color: 'var(--danger)' }}>Declarar Imposibilidad de Resolución</h4>
+                        <form onSubmit={handleImpossibilitySubmit} className="status-update-form">
+                          <div className="form-group">
+                            <label htmlFor="impossibility-reason">Motivo Detallado de la Imposibilidad:</label>
+                            <textarea
+                              id="impossibility-reason"
+                              rows="3"
+                              placeholder="Explique detalladamente por qué no se puede resolver esta incidencia (ej. requiere maquinaria pesada, es propiedad privada, etc.)..."
+                              value={impossibilityReason}
+                              onChange={(e) => setImpossibilityReason(e.target.value)}
+                              required
+                            ></textarea>
+                          </div>
+                          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                            <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowImpossibilityForm(false)}>
+                              Cancelar
+                            </button>
+                            <button type="submit" className="btn btn-primary" style={{ flex: 1, backgroundColor: 'var(--danger)', borderColor: 'var(--danger)' }}>
+                              Notificar a Autoridad
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+                  </>
+                )}
 
                 <div className="detail-section">
                   <h4>Línea de Tiempo y Avances</h4>
@@ -487,9 +620,54 @@ export default function FieldStaffDashboard({ user, onLogout }) {
                 </div>
               </div>
             </section>
-          )}
-        </div>
+          </div>
+        )}
       </main>
+
+      {/* Zoom Modal Overlay */}
+      {zoomedImage && (
+        <div className="modal-overlay" onClick={() => setZoomedImage(null)} style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 3000,
+          cursor: 'zoom-out',
+          animation: 'fade-in 0.2s ease'
+        }}>
+          <div className="zoom-image-container" style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%' }}>
+            <img src={zoomedImage} alt="Evidencia Ampliada" style={{
+              width: '100%',
+              height: 'auto',
+              maxHeight: '80vh',
+              objectFit: 'contain',
+              borderRadius: 'var(--radius-sm)',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+            }} />
+            <button
+              type="button"
+              onClick={() => setZoomedImage(null)}
+              style={{
+                position: 'absolute',
+                top: '-40px',
+                right: '0',
+                background: 'none',
+                border: 'none',
+                color: 'white',
+                fontSize: '24px',
+                cursor: 'pointer'
+              }}
+            >
+              Cerrar ✖
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

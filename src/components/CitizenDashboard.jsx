@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getReports, createReport, CATEGORIES, PRIORITIES, STATUSES, updateUserProfile, getNotifications, markNotificationRead, markAllNotificationsRead } from '../mockData';
+import { MapSelector, MapPreview } from './MapComponents';
 
 // Fallback data in case the public API has CORS issues or is offline
 const FALLBACK_GEOGRAPHY = {
@@ -21,17 +22,79 @@ const FALLBACK_GEOGRAPHY = {
     '2': [
       { id: '201', nombre: 'Alajuela' },
       { id: '202', nombre: 'San Ramón' }
+    ],
+    '3': [
+      { id: '301', nombre: 'Cartago' },
+      { id: '302', nombre: 'Paraíso' }
+    ],
+    '4': [
+      { id: '401', nombre: 'Heredia' },
+      { id: '402', nombre: 'Barva' }
+    ],
+    '5': [
+      { id: '501', nombre: 'Liberia' },
+      { id: '502', nombre: 'Nicoya' }
+    ],
+    '6': [
+      { id: '601', nombre: 'Puntarenas' },
+      { id: '602', nombre: 'Esparza' }
+    ],
+    '7': [
+      { id: '701', nombre: 'Limón' },
+      { id: '702', nombre: 'Pococí' }
     ]
   },
   distritos: {
+    '101': [
+      { id: '10101', nombre: 'Carmen' },
+      { id: '10102', nombre: 'Merced' }
+    ],
     '102': [
       { id: '10201', nombre: 'Escazú Centro' },
       { id: '10202', nombre: 'San Antonio' },
       { id: '10203', nombre: 'San Rafael' }
     ],
-    '101': [
-      { id: '10101', nombre: 'Carmen' },
-      { id: '10102', nombre: 'Merced' }
+    '103': [
+      { id: '10301', nombre: 'Desamparados Centro' }
+    ],
+    '201': [
+      { id: '20101', nombre: 'Alajuela Centro' },
+      { id: '20102', nombre: 'San José' }
+    ],
+    '202': [
+      { id: '20201', nombre: 'San Ramón Centro' }
+    ],
+    '301': [
+      { id: '30101', nombre: 'Oriental' },
+      { id: '30102', nombre: 'Occidental' }
+    ],
+    '302': [
+      { id: '30201', nombre: 'Paraíso Centro' }
+    ],
+    '401': [
+      { id: '40101', nombre: 'Heredia Centro' },
+      { id: '40102', nombre: 'Mercedes' }
+    ],
+    '402': [
+      { id: '40201', nombre: 'Barva Centro' }
+    ],
+    '501': [
+      { id: '50101', nombre: 'Liberia Centro' }
+    ],
+    '502': [
+      { id: '50201', nombre: 'Nicoya Centro' }
+    ],
+    '601': [
+      { id: '60101', nombre: 'Puntarenas Centro' }
+    ],
+    '602': [
+      { id: '60201', nombre: 'Esparza Centro' }
+    ],
+    '701': [
+      { id: '70101', nombre: 'Limón Centro' }
+    ],
+    '702': [
+      { id: '70201', nombre: 'Guápiles' }
     ]
   }
 };
@@ -69,11 +132,15 @@ export default function CitizenDashboard({ user, onLogout }) {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
-  const mapRef = useRef(null);
+  // History Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   useEffect(() => {
     loadReports();
     loadNotifications();
+    fetchProvincias();
 
     // Auto-reload to simulate real-time notification/status checks
     const interval = setInterval(() => {
@@ -119,28 +186,6 @@ export default function CitizenDashboard({ user, onLogout }) {
     }
   }, [showForm]);
 
-  // Fetch Cantones when Provincia changes
-  useEffect(() => {
-    if (selectedProvincia) {
-      fetchCantones(selectedProvincia);
-    } else {
-      setCantones([]);
-      setDistritos([]);
-      setSelectedCanton('');
-      setSelectedDistrito('');
-    }
-  }, [selectedProvincia]);
-
-  // Fetch Distritos when Canton changes
-  useEffect(() => {
-    if (selectedCanton) {
-      fetchDistritos(selectedCanton);
-    } else {
-      setDistritos([]);
-      setSelectedDistrito('');
-    }
-  }, [selectedCanton]);
-
   const loadReports = () => {
     const all = getReports();
     const filtered = all.filter((r) => r.citizenEmail === user.email);
@@ -149,13 +194,61 @@ export default function CitizenDashboard({ user, onLogout }) {
     setReports(sorted);
   };
 
+  const filteredReports = reports.filter((rep) => {
+    const matchesSearch = 
+      rep.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (rep.description && rep.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      rep.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      rep.id.toLowerCase().includes(searchTerm.toLowerCase());
+      
+    const matchesStatus = statusFilter === 'all' || rep.status === statusFilter;
+    const matchesCategory = categoryFilter === 'all' || rep.category === categoryFilter;
+    
+    return matchesSearch && matchesStatus && matchesCategory;
+  });
+
   // --- API Geographic Fetching ---
+  const getCantonesList = async (provinciaId) => {
+    if (!provinciaId) return [];
+    // Swap Cartago (3) and Heredia (4) because the API has them swapped
+    const apiProvinciaId = provinciaId === '3' ? '4' : (provinciaId === '4' ? '3' : provinciaId);
+    try {
+      const response = await fetch(`https://api-geo-cr.vercel.app/provincias/${apiProvinciaId}/cantones?limit=100`);
+      if (!response.ok) throw new Error('API down');
+      const json = await response.json();
+      return (json.data || []).map(c => ({
+        id: String(c.idCanton),
+        nombre: c.descripcion
+      }));
+    } catch (error) {
+      console.warn('Using local fallback for Cantones:', error);
+      return FALLBACK_GEOGRAPHY.cantones[provinciaId] || [];
+    }
+  };
+
+  const getDistritosList = async (cantonId) => {
+    if (!cantonId) return [];
+    try {
+      const response = await fetch(`https://api-geo-cr.vercel.app/cantones/${cantonId}/distritos?limit=100`);
+      if (!response.ok) throw new Error('API down');
+      const json = await response.json();
+      return (json.data || []).map(d => ({
+        id: String(d.idDistrito),
+        nombre: d.descripcion
+      }));
+    } catch (error) {
+      console.warn('Using local fallback for Distritos:', error);
+      return FALLBACK_GEOGRAPHY.distritos[cantonId] || [];
+    }
+  };
+
   const fetchProvincias = async () => {
     setIsLoadingGeo(true);
     try {
-      const response = await fetch('https://api-geo-cr.vercel.app/provincias');
+      const response = await fetch('https://api-geo-cr.vercel.app/provincias?limit=100');
       if (!response.ok) throw new Error('API down');
       const json = await response.json();
+      console.log('API Provinces response:', json.data);
       
       // Map API fields (idProvincia, descripcion) to unified structure ({ id, nombre })
       const mapped = (json.data || []).map(p => ({
@@ -164,13 +257,9 @@ export default function CitizenDashboard({ user, onLogout }) {
       }));
 
       setProvincias(mapped);
-      if (mapped.length > 0) {
-        setSelectedProvincia(mapped[0].id);
-      }
     } catch (error) {
       console.warn('Using local fallback for Provincias:', error);
       setProvincias(FALLBACK_GEOGRAPHY.provincias);
-      setSelectedProvincia(FALLBACK_GEOGRAPHY.provincias[0].id);
     } finally {
       setIsLoadingGeo(false);
     }
@@ -178,58 +267,16 @@ export default function CitizenDashboard({ user, onLogout }) {
 
   const fetchCantones = async (provinciaId) => {
     setIsLoadingGeo(true);
-    try {
-      const response = await fetch(`https://api-geo-cr.vercel.app/provincias/${provinciaId}/cantones`);
-      if (!response.ok) throw new Error('API down');
-      const json = await response.json();
-      
-      const mapped = (json.data || []).map(c => ({
-        id: String(c.idCanton),
-        nombre: c.descripcion
-      }));
-
-      setCantones(mapped);
-      if (mapped.length > 0) {
-        setSelectedCanton(mapped[0].id);
-      }
-    } catch (error) {
-      console.warn('Using local fallback for Cantones:', error);
-      const fallbackList = FALLBACK_GEOGRAPHY.cantones[provinciaId] || [];
-      setCantones(fallbackList);
-      if (fallbackList.length > 0) {
-        setSelectedCanton(fallbackList[0].id);
-      }
-    } finally {
-      setIsLoadingGeo(false);
-    }
+    const list = await getCantonesList(provinciaId);
+    setCantones(list);
+    setIsLoadingGeo(false);
   };
 
   const fetchDistritos = async (cantonId) => {
     setIsLoadingGeo(true);
-    try {
-      const response = await fetch(`https://api-geo-cr.vercel.app/cantones/${cantonId}/distritos`);
-      if (!response.ok) throw new Error('API down');
-      const json = await response.json();
-      
-      const mapped = (json.data || []).map(d => ({
-        id: String(d.idDistrito),
-        nombre: d.descripcion
-      }));
-
-      setDistritos(mapped);
-      if (mapped.length > 0) {
-        setSelectedDistrito(mapped[0].id);
-      }
-    } catch (error) {
-      console.warn('Using local fallback for Distritos:', error);
-      const fallbackList = FALLBACK_GEOGRAPHY.distritos[cantonId] || [];
-      setDistritos(fallbackList);
-      if (fallbackList.length > 0) {
-        setSelectedDistrito(fallbackList[0].id);
-      }
-    } finally {
-      setIsLoadingGeo(false);
-    }
+    const list = await getDistritosList(cantonId);
+    setDistritos(list);
+    setIsLoadingGeo(false);
   };
 
   // Image Upload helper (Base64)
@@ -259,34 +306,107 @@ export default function CitizenDashboard({ user, onLogout }) {
     setUploadedImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  // Simulated Map Actions
-  const handleMapClick = (e) => {
-    if (!mapRef.current) return;
-    const rect = mapRef.current.getBoundingClientRect();
-    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
-    setMapCoordinates({ x, y });
+  // Real Map Selection Action
+  const handleMapSelect = async (coords) => {
+    setFormError('');
+    setMapCoordinates(coords);
     
-    // Auto-fill address using selected CR divisions
+    const defaultDesc = `Calle Vecinal (Lat: ${coords.lat.toFixed(5)}, Lng: ${coords.lng.toFixed(5)})`;
+    
+    // Attempt reverse geocoding to auto-select Costa Rican geographic divisions
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.lat}&lon=${coords.lng}`, {
+        headers: { 'Accept-Language': 'es' }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const addr = json.address || {};
+        
+        const stateName = addr.state || '';
+        const countyName = addr.county || addr.city || addr.town || '';
+        const districtName = addr.suburb || addr.neighbourhood || addr.village || addr.city_district || addr.hamlet || '';
+        
+        const clean = str => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        const cleanDisplayName = name => {
+          if (!name) return '';
+          return name
+            .replace(/Cantón de\s+/i, '')
+            .replace(/Cantón\s+/i, '')
+            .replace(/Distrito de\s+/i, '')
+            .replace(/Distrito\s+/i, '')
+            .trim();
+        };
+        
+        // 1. Match Provincia
+        const matchedProv = provincias.find(p => clean(p.nombre) === clean(stateName) || clean(stateName).includes(clean(p.nombre)) || clean(p.nombre).includes(clean(stateName)));
+        if (matchedProv) {
+          setSelectedProvincia(matchedProv.id);
+          
+          let matchedCanton = null;
+          let matchedDistrito = null;
+
+          // Fetch cantones (uses helper which falls back to local data if API is down)
+          const mappedCantons = await getCantonesList(matchedProv.id);
+          
+          // 2. Match Cantón
+          matchedCanton = mappedCantons.find(c => clean(c.nombre) === clean(countyName) || clean(countyName).includes(clean(c.nombre)) || clean(c.nombre).includes(clean(countyName)));
+          if (!matchedCanton && countyName) {
+            const cleanCantonName = cleanDisplayName(countyName);
+            matchedCanton = {
+              id: `custom-canton-${clean(cleanCantonName)}`,
+              nombre: cleanCantonName
+            };
+            mappedCantons.push(matchedCanton);
+          }
+          
+          setCantones(mappedCantons);
+          
+          if (matchedCanton) {
+            setSelectedCanton(matchedCanton.id);
+            
+            // Fetch distritos (uses helper which falls back to local data if API is down)
+            let mappedDistritos = [];
+            if (!matchedCanton.id.startsWith('custom-canton-')) {
+              mappedDistritos = await getDistritosList(matchedCanton.id);
+            }
+            
+            // 3. Match Distrito
+            matchedDistrito = mappedDistritos.find(d => clean(d.nombre) === clean(districtName) || clean(districtName).includes(clean(d.nombre)) || clean(d.nombre).includes(clean(districtName)));
+            const resolvedDistName = districtName || countyName || matchedCanton.nombre;
+            if (!matchedDistrito && resolvedDistName) {
+              const cleanDistName = cleanDisplayName(resolvedDistName);
+              matchedDistrito = {
+                id: `custom-distrito-${clean(cleanDistName)}`,
+                nombre: cleanDistName
+              };
+              mappedDistritos.push(matchedDistrito);
+            }
+            
+            setDistritos(mappedDistritos);
+            
+            if (matchedDistrito) {
+              setSelectedDistrito(matchedDistrito.id);
+            }
+          }
+          
+          // Generate customized address
+          const cName = matchedCanton ? matchedCanton.nombre : countyName;
+          const dName = matchedDistrito ? matchedDistrito.nombre : districtName;
+          const names = [matchedProv.nombre, cName, dName].filter(Boolean).join(', ');
+          setLocation(`${names} - ${defaultDesc}`);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Reverse geocoding error:', e);
+    }
+    
+    // Fallback if reverse geocoding matches fail
     const provName = provincias.find(p => p.id === selectedProvincia)?.nombre || '';
     const cantName = cantones.find(c => c.id === selectedCanton)?.nombre || '';
     const distName = distritos.find(d => d.id === selectedDistrito)?.nombre || '';
-    
     const locationPrefix = [provName, cantName, distName].filter(Boolean).join(', ');
-    setLocation(`${locationPrefix} - Calle Vecinal (Cerca de Cuadrante ${x}x${y})`);
-  };
-
-  const handleUseGPS = () => {
-    const randomX = Math.floor(Math.random() * 60) + 20;
-    const randomY = Math.floor(Math.random() * 60) + 20;
-    setMapCoordinates({ x: randomX, y: randomY });
-
-    const provName = provincias.find(p => p.id === selectedProvincia)?.nombre || '';
-    const cantName = cantones.find(c => c.id === selectedCanton)?.nombre || '';
-    const distName = distritos.find(d => d.id === selectedDistrito)?.nombre || '';
-    const locationPrefix = [provName, cantName, distName].filter(Boolean).join(', ');
-
-    setLocation(`📍 GPS: ${locationPrefix} - Lat: 9.93${randomY}, Lng: -84.08${randomX}`);
+    setLocation(`${locationPrefix ? locationPrefix + ' - ' : ''}${defaultDesc}`);
   };
 
   const handleSubmit = (e) => {
@@ -347,6 +467,11 @@ export default function CitizenDashboard({ user, onLogout }) {
       setPriority('medium');
       setUploadedImages([]);
       setMapCoordinates(null);
+      setSelectedProvincia('');
+      setSelectedCanton('');
+      setSelectedDistrito('');
+      setCantones([]);
+      setDistritos([]);
       
       loadReports();
       
@@ -442,14 +567,6 @@ export default function CitizenDashboard({ user, onLogout }) {
 
             {showNotifDropdown && (
               <div className="notification-dropdown card" style={{
-                position: 'absolute',
-                top: '50px',
-                right: '0',
-                width: '320px',
-                maxHeight: '400px',
-                overflowY: 'auto',
-                zIndex: 1000,
-                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
                 animation: 'fade-in 0.2s ease'
               }}>
                 <div className="dropdown-header" style={{
@@ -577,7 +694,7 @@ export default function CitizenDashboard({ user, onLogout }) {
         {showForm ? (
           <section className="form-section card animate-slide-up">
             <div className="card-header">
-              <h3>Crear Nuevo Reporte (API Geo-CR Integrada)</h3>
+              <h3>Crear Nuevo Reporte</h3>
               <p>Por favor complete los campos obligatorios indicados con <span style={{ color: 'var(--danger)', fontWeight: 'bold' }}>*</span></p>
             </div>
             
@@ -620,9 +737,20 @@ export default function CitizenDashboard({ user, onLogout }) {
                   <select
                     id="geo-prov"
                     value={selectedProvincia}
-                    onChange={(e) => setSelectedProvincia(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedProvincia(val);
+                      setSelectedCanton('');
+                      setSelectedDistrito('');
+                      setCantones([]);
+                      setDistritos([]);
+                      if (val) {
+                        fetchCantones(val);
+                      }
+                    }}
                     disabled={isLoadingGeo && provincias.length === 0}
                   >
+                    <option value="">Seleccione Provincia...</option>
                     {provincias.map((p) => (
                       <option key={p.id} value={p.id}>{p.nombre}</option>
                     ))}
@@ -634,8 +762,16 @@ export default function CitizenDashboard({ user, onLogout }) {
                   <select
                     id="geo-cant"
                     value={selectedCanton}
-                    onChange={(e) => setSelectedCanton(e.target.value)}
-                    disabled={cantones.length === 0}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedCanton(val);
+                      setSelectedDistrito('');
+                      setDistritos([]);
+                      if (val) {
+                        fetchDistritos(val);
+                      }
+                    }}
+                    disabled={!selectedProvincia || cantones.length === 0}
                   >
                     <option value="">Seleccione Cantón...</option>
                     {cantones.map((c) => (
@@ -650,7 +786,7 @@ export default function CitizenDashboard({ user, onLogout }) {
                     id="geo-dist"
                     value={selectedDistrito}
                     onChange={(e) => setSelectedDistrito(e.target.value)}
-                    disabled={distritos.length === 0}
+                    disabled={!selectedCanton || distritos.length === 0}
                   >
                     <option value="">Seleccione Distrito...</option>
                     {distritos.map((d) => (
@@ -707,39 +843,17 @@ export default function CitizenDashboard({ user, onLogout }) {
                 )}
               </div>
 
-              {/* Coordinates & Mock Map */}
+              {/* Coordinates & Leaflet Map */}
               <div className="form-row">
                 <div className="form-group flex-1">
-                  <label>Ubicación Geográfica Exacta <span style={{ color: 'var(--danger)' }}>*</span></label>
-                  <p className="form-helper" style={{ margin: '0 0 10px 0' }}>Haga clic sobre el plano interactivo para colocar el marcador o use el botón GPS.</p>
-                  
-                  <div className="map-mock-container" ref={mapRef} onClick={handleMapClick}>
-                    <div className="map-grid-bg">
-                      <div className="map-street h-street-1"></div>
-                      <div className="map-street h-street-2"></div>
-                      <div className="map-street v-street-1"></div>
-                      <div className="map-street v-street-2"></div>
-                      <div className="map-neighborhood block-a">Parque</div>
-                      <div className="map-neighborhood block-b">Zona Residencial</div>
-                      <div className="map-neighborhood block-c">Municipalidad</div>
-                    </div>
-                    {mapCoordinates && (
-                      <div
-                        className="map-marker-pin"
-                        style={{ left: `${mapCoordinates.x}%`, top: `${mapCoordinates.y}%` }}
-                      >
-                        📍
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm btn-gps"
-                    onClick={handleUseGPS}
-                    style={{ marginTop: '10px', width: '100%' }}
-                  >
-                    🛰️ Usar GPS del Dispositivo (Simulado)
-                  </button>
+                   <label>Ubicación Geográfica Exacta <span style={{ color: 'var(--danger)' }}>*</span></label>
+                   <p className="form-helper" style={{ margin: '0 0 10px 0' }}>Haga clic sobre el mapa para colocar el pin de la incidencia o usa el GPS.</p>
+                   
+                   <MapSelector
+                     onSelectCoordinates={handleMapSelect}
+                     initialCoordinates={mapCoordinates}
+                     provinceName={provincias.find(p => p.id === selectedProvincia)?.nombre}
+                   />
                 </div>
 
                 <div className="form-group flex-1">
@@ -752,25 +866,12 @@ export default function CitizenDashboard({ user, onLogout }) {
                     onChange={(e) => setLocation(e.target.value)}
                     required
                   />
-                  <div style={{ marginTop: '20px' }}>
-                    <label htmlFor="rep-prio-sug">Urgencia Sugerida</label>
-                    <select
-                      id="rep-prio-sug"
-                      value={priority}
-                      onChange={(e) => setPriority(e.target.value)}
-                    >
-                      {PRIORITIES.map((p) => (
-                        <option key={p.value} value={p.value}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  
                   {mapCoordinates && (
                     <div className="coordinates-display card" style={{ marginTop: '16px', padding: '10px', background: 'var(--bg-main)' }}>
                       <strong>Coordenadas del Pin:</strong>
                       <code style={{ fontSize: '12px', display: 'block', marginTop: '4px' }}>
-                        X: {mapCoordinates.x}%, Y: {mapCoordinates.y}% (Guardado)
+                        {mapCoordinates.lat ? `Lat: ${mapCoordinates.lat.toFixed(5)}, Lng: ${mapCoordinates.lng.toFixed(5)}` : `X: ${mapCoordinates.x}%, Y: ${mapCoordinates.y}%`}
                       </code>
                     </div>
                   )}
@@ -800,6 +901,51 @@ export default function CitizenDashboard({ user, onLogout }) {
               <p>Seguimiento de incidencias con fotos y ubicación del mapa.</p>
             </div>
 
+            {/* Filtros de búsqueda para historial */}
+            {reports.length > 0 && (
+              <div className="filter-bar" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', padding: '16px', marginBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+                <div className="filter-group" style={{ flex: 2, minWidth: '200px', margin: 0 }}>
+                  <label htmlFor="user-filter-search">Buscar Reporte:</label>
+                  <input
+                    id="user-filter-search"
+                    type="text"
+                    placeholder="Buscar por código, título, ubicación..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
+                  />
+                </div>
+                <div className="filter-group" style={{ flex: 1, minWidth: '150px', margin: 0 }}>
+                  <label htmlFor="user-filter-status">Estado:</label>
+                  <select
+                    id="user-filter-status"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
+                  >
+                    <option value="all">Todos los Estados</option>
+                    {STATUSES.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="filter-group" style={{ flex: 1, minWidth: '150px', margin: 0 }}>
+                  <label htmlFor="user-filter-cat">Categoría:</label>
+                  <select
+                    id="user-filter-cat"
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    style={{ width: '100%', padding: '8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
+                  >
+                    <option value="all">Todas las Categorías</option>
+                    {CATEGORIES.map((c) => (
+                      <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
             {reports.length === 0 ? (
               <div className="empty-state">
                 <span className="empty-icon">📁</span>
@@ -810,6 +956,22 @@ export default function CitizenDashboard({ user, onLogout }) {
                   onClick={() => setShowForm(true)}
                 >
                   Crear mi primer reporte
+                </button>
+              </div>
+            ) : filteredReports.length === 0 ? (
+              <div className="empty-state">
+                <span className="empty-icon">🔍</span>
+                <p>No se encontraron reportes con los criterios de búsqueda seleccionados.</p>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setStatusFilter('all');
+                    setCategoryFilter('all');
+                  }}
+                >
+                  Limpiar Filtros
                 </button>
               </div>
             ) : (
@@ -827,21 +989,21 @@ export default function CitizenDashboard({ user, onLogout }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {reports.map((rep) => (
+                    {filteredReports.map((rep) => (
                       <tr
                         key={rep.id}
                         className={selectedReport?.id === rep.id ? 'row-selected' : ''}
                       >
-                        <td><span className="code-tag">{rep.id}</span></td>
-                        <td>
+                        <td data-label="Código"><span className="code-tag">{rep.id}</span></td>
+                        <td data-label="Incidencia">
                           <div className="table-report-info">
                             <strong>{rep.title}</strong>
                             <span className="text-muted truncate-text">{rep.location}</span>
                           </div>
                         </td>
-                        <td>{getCategoryIcon(rep.category)}</td>
-                        <td>{new Date(rep.createdAt).toLocaleDateString()}</td>
-                        <td>
+                        <td data-label="Categoría">{getCategoryIcon(rep.category)}</td>
+                        <td data-label="Fecha">{new Date(rep.createdAt).toLocaleDateString()}</td>
+                        <td data-label="Evidencia">
                           {rep.images && rep.images.length > 0 ? (
                             <span style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: '600' }}>
                               📸 {rep.images.length} foto(s)
@@ -850,8 +1012,8 @@ export default function CitizenDashboard({ user, onLogout }) {
                             <span className="text-muted">Sin fotos</span>
                           )}
                         </td>
-                        <td>{getStatusBadge(rep.status)}</td>
-                        <td>
+                        <td data-label="Estado">{getStatusBadge(rep.status)}</td>
+                        <td data-label="Acciones">
                           <button
                             type="button"
                             className="btn btn-secondary btn-xs"
@@ -870,9 +1032,12 @@ export default function CitizenDashboard({ user, onLogout }) {
               </div>
             )}
           </section>
+        </div>
 
-          {selectedReport && (
-            <section className="report-detail-section card animate-fade-in">
+        {/* Detail Drawer Overlay */}
+        {selectedReport && (
+          <div className="drawer-overlay" onClick={() => setSelectedReport(null)}>
+            <section className="report-detail-section card drawer-panel animate-fade-in" onClick={(e) => e.stopPropagation()}>
               <div className="card-header detail-header">
                 <div>
                   <span className="code-tag">{selectedReport.id}</span>
@@ -921,23 +1086,7 @@ export default function CitizenDashboard({ user, onLogout }) {
                 {selectedReport.coordinates && (
                   <div className="detail-section">
                     <h4>Mapa de Ubicación Registrada</h4>
-                    <div className="map-mock-container static-preview">
-                      <div className="map-grid-bg">
-                        <div className="map-street h-street-1"></div>
-                        <div className="map-street h-street-2"></div>
-                        <div className="map-street v-street-1"></div>
-                        <div className="map-street v-street-2"></div>
-                        <div className="map-neighborhood block-a">Parque</div>
-                        <div className="map-neighborhood block-b">Zona Residencial</div>
-                        <div className="map-neighborhood block-c">Municipalidad</div>
-                      </div>
-                      <div
-                        className="map-marker-pin animate-pulse"
-                        style={{ left: `${selectedReport.coordinates.x}%`, top: `${selectedReport.coordinates.y}%` }}
-                      >
-                        📍
-                      </div>
-                    </div>
+                    <MapPreview coordinates={selectedReport.coordinates} />
                   </div>
                 )}
 
@@ -1007,8 +1156,8 @@ export default function CitizenDashboard({ user, onLogout }) {
                 </div>
               </div>
             </section>
-          )}
-        </div>
+          </div>
+        )}
       </main>
 
       {/* Profile/Config Modal */}

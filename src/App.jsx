@@ -57,33 +57,25 @@ function App() {
 
   return (
     <>
-      <nav className="main-navbar">
-        <div className="navbar-brand">
-          <span className="brand-logo-small">🏛️</span>
-          <span>Gobierno Local - Reporte Ciudadano</span>
-        </div>
-        {currentUser && (
-          <div className="navbar-user">
-            <span className="navbar-user-name">📍 {currentUser.name}</span>
-            <button
-              type="button"
-              className="navbar-logout-link"
-              onClick={handleLogout}
-            >
-              Cerrar Sesión
-            </button>
+      {!currentUser && (
+        <nav className="main-navbar">
+          <div className="navbar-brand">
+            <span className="brand-logo-small">🏛️</span>
+            <span>Gobierno Local - Reporte Ciudadano</span>
           </div>
-        )}
-      </nav>
+        </nav>
+      )}
       
-      <div className="app-main-content">
+      <div className={`app-main-content ${!currentUser ? 'auth-layout' : ''}`}>
         {renderDashboard()}
       </div>
 
-      <footer className="main-footer">
-        <p>© 2026 Municipalidad de Reporte Ciudadano. Todos los derechos reservados.</p>
-        <p className="footer-sub">Diseñado para la Transparencia y Eficiencia en la Gestión de Servicios Comunitarios.</p>
-      </footer>
+      {currentUser && (
+        <footer className="main-footer">
+          <p>© 2026 Municipalidad de Reporte Ciudadano. Todos los derechos reservados.</p>
+          <p className="footer-sub">Diseñado para la Transparencia y Eficiencia en la Gestión de Servicios Comunitarios.</p>
+        </footer>
+      )}
     </>
   );
 }

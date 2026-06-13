@@ -13,6 +13,12 @@ export const DEFAULT_USERS = [
     name: 'Carlos Mendoza',
     role: 'personal_campo',
     department: 'Mantenimiento de Vías'
+  },
+  {
+    email: 'ciudadano@ejemplo.com',
+    password: 'ciudadano123',
+    name: 'Usuario PoC (Ciudadano)',
+    role: 'ciudadano'
   }
 ];
 
@@ -51,13 +57,13 @@ const INITIAL_REPORTS = [
     status: 'assigned',
     assignedTo: 'campo@municipal.go.cr',
     citizenEmail: 'vecino.preocupado@gmail.com',
-    createdAt: '2026-05-24T10:30:00Z',
+    createdAt: '2026-06-10T10:30:00Z',
     notes: 'Asignado prioritariamente para reparación urgente.',
-    coordinates: { x: 35, y: 48 }, // Coordinates relative to our custom interactive map grid (%)
+    coordinates: { x: 35, y: 48, lat: 9.9364, lng: -84.1045 },
     images: [],
     history: [
-      { date: '2026-05-24T10:30:00Z', status: 'received', note: 'Reporte registrado por ciudadano' },
-      { date: '2026-05-24T14:00:00Z', status: 'assigned', note: 'Asignado a Carlos Mendoza para inspección' }
+      { date: '2026-06-10T10:30:00Z', status: 'received', note: 'Reporte registrado por ciudadano' },
+      { date: '2026-06-10T14:00:00Z', status: 'assigned', note: 'Asignado a Carlos Mendoza para inspección' }
     ]
   },
   {
@@ -69,11 +75,187 @@ const INITIAL_REPORTS = [
     priority: 'low',
     status: 'received',
     citizenEmail: 'maria.rodriguez@gmail.com',
-    createdAt: '2026-05-25T07:15:00Z',
-    coordinates: { x: 62, y: 28 },
+    createdAt: '2026-06-11T07:15:00Z',
+    coordinates: { x: 62, y: 28, lat: 9.9504, lng: -84.0694 },
     images: [],
     history: [
-      { date: '2026-05-25T07:15:00Z', status: 'received', note: 'Reporte registrado por ciudadano' }
+      { date: '2026-06-11T07:15:00Z', status: 'received', note: 'Reporte registrado por ciudadano' }
+    ]
+  },
+  {
+    id: 'rep-3',
+    title: 'Bache profundo en vía principal de Heredia',
+    description: 'Hay un cráter de gran tamaño en media calle que está provocando daños en los aros de los vehículos y maniobras evasivas peligrosas.',
+    category: 'vias',
+    location: 'Heredia, Heredia, Heredia Centro - Frente a la entrada del Polideportivo, carril izquierdo',
+    priority: 'high',
+    status: 'assigned',
+    assignedTo: 'campo@municipal.go.cr',
+    citizenEmail: 'juan.perez@ejemplo.com',
+    createdAt: '2026-06-12T14:20:00Z',
+    notes: 'Programada inspección de bacheo.',
+    coordinates: { x: 24, y: 0, lat: 9.9994, lng: -84.1182 },
+    images: [],
+    history: [
+      { date: '2026-06-12T14:20:00Z', status: 'received', note: 'Reporte registrado por ciudadano' },
+      { date: '2026-06-12T16:00:00Z', status: 'assigned', note: 'Asignado a Carlos Mendoza' }
+    ]
+  },
+  {
+    id: 'rep-4',
+    title: 'Alcantarilla sin tapa en la acera',
+    description: 'Falta la rejilla metálica de la alcantarilla en la acera peatonal, lo cual representa una trampa peligrosa para peatones y niños por la noche.',
+    category: 'agua',
+    location: 'Heredia, Heredia, Heredia Centro - Calle 4, 50 metros norte del Parque Central',
+    priority: 'high',
+    status: 'received',
+    citizenEmail: 'ciudadano.activo@gmail.com',
+    createdAt: '2026-06-12T18:45:00Z',
+    coordinates: { x: 27, y: 0, lat: 10.0012, lng: -84.1145 },
+    images: [],
+    history: [
+      { date: '2026-06-12T18:45:00Z', status: 'received', note: 'Reporte registrado por ciudadano' }
+    ]
+  },
+  {
+    id: 'rep-5',
+    title: 'Acumulación de basura en parque infantil',
+    description: 'Han dejado gran cantidad de bolsas de basura y desechos de jardín en el área de juegos, obstruyendo el paso y atrayendo plagas.',
+    category: 'aseo',
+    location: 'Heredia, Heredia, Mercedes - Parque Infantil de Mercedes Norte, sector oeste',
+    priority: 'medium',
+    status: 'received',
+    citizenEmail: 'vecina.mercedes@gmail.com',
+    createdAt: '2026-06-13T09:10:00Z',
+    coordinates: { x: 17, y: 0, lat: 10.0064, lng: -84.1282 },
+    images: [],
+    history: [
+      { date: '2026-06-13T09:10:00Z', status: 'received', note: 'Reporte registrado por ciudadano' }
+    ]
+  },
+  {
+    id: 'rep-6',
+    title: 'Semáforo dañado causa colisiones',
+    description: 'El semáforo peatonal e intersectorial se encuentra completamente apagado en una intersección con alta fluidez de vehículos.',
+    category: 'otros',
+    location: 'Alajuela, Alajuela, Alajuela Centro - Cruce del Parque de la Agonía',
+    priority: 'high',
+    status: 'in_progress',
+    assignedTo: 'campo@municipal.go.cr',
+    citizenEmail: 'alajuelense.preocupado@gmail.com',
+    createdAt: '2026-06-11T12:00:00Z',
+    notes: 'Equipo técnico en camino.',
+    coordinates: { x: 0, y: 0, lat: 10.0175, lng: -84.2132 },
+    images: [],
+    history: [
+      { date: '2026-06-11T12:00:00Z', status: 'received', note: 'Reporte registrado por ciudadano' },
+      { date: '2026-06-11T13:30:00Z', status: 'assigned', note: 'Asignado a Carlos Mendoza' },
+      { date: '2026-06-11T14:00:00Z', status: 'in_progress', note: 'Inspección de cableado y fusibles iniciada' }
+    ]
+  },
+  {
+    id: 'rep-7',
+    title: 'Fuga de agua potable en acera principal',
+    description: 'Brota agua limpia constantemente desde la base del medidor de una propiedad comercial, inundando el paso de peatones.',
+    category: 'agua',
+    location: 'Alajuela, Alajuela, Alajuela Centro - 100 metros oeste de la Catedral de Alajuela',
+    priority: 'medium',
+    status: 'received',
+    citizenEmail: 'comerciante.centro@gmail.com',
+    createdAt: '2026-06-13T08:00:00Z',
+    coordinates: { x: 0, y: 0, lat: 10.0192, lng: -84.2085 },
+    images: [],
+    history: [
+      { date: '2026-06-13T08:00:00Z', status: 'received', note: 'Reporte registrado por ciudadano' }
+    ]
+  },
+  {
+    id: 'rep-8',
+    title: 'Escombros bloquean paso peatonal',
+    description: 'Dejaron materiales de construcción (piedra, arena) sobre la acera y parte del carril derecho de circulación sin ninguna señalización.',
+    category: 'aseo',
+    location: 'Cartago, Cartago, Oriental - Calle 3, entre Avenidas 2 y 4',
+    priority: 'medium',
+    status: 'received',
+    citizenEmail: 'cartagines.peaton@gmail.com',
+    createdAt: '2026-06-12T10:15:00Z',
+    coordinates: { x: 100, y: 100, lat: 9.8654, lng: -83.9192 },
+    images: [],
+    history: [
+      { date: '2026-06-12T10:15:00Z', status: 'received', note: 'Reporte registrado por ciudadano' }
+    ]
+  },
+  {
+    id: 'rep-9',
+    title: 'Poste de luz dañado por choque',
+    description: 'Un camión golpeó la base del poste del alumbrado público. El poste se encuentra visiblemente agrietado y la lámpara superior se desprendió.',
+    category: 'alumbrado',
+    location: 'Cartago, Cartago, Oriental - Frente al costado sur de la Basílica de Los Ángeles',
+    priority: 'high',
+    status: 'assigned',
+    assignedTo: 'campo@municipal.go.cr',
+    citizenEmail: 'parroco.angeles@gmail.com',
+    createdAt: '2026-06-13T06:30:00Z',
+    notes: 'Coordinado con el departamento de obras públicas municipales.',
+    coordinates: { x: 100, y: 100, lat: 9.8631, lng: -83.9154 },
+    images: [],
+    history: [
+      { date: '2026-06-13T06:30:00Z', status: 'received', note: 'Reporte registrado por ciudadano' },
+      { date: '2026-06-13T08:00:00Z', status: 'assigned', note: 'Asignado a Carlos Mendoza para delimitación de área' }
+    ]
+  },
+  {
+    id: 'rep-10',
+    title: 'Ramas de árbol obstruyen cables eléctricos',
+    description: 'Las ramas de un gran árbol de ciprés en propiedad pública están en contacto directo con las líneas de alta tensión, provocando chispas con el viento.',
+    category: 'parques',
+    location: 'San José, Escazú, San Rafael - Residencial El Cortijo, parque de la etapa 2',
+    priority: 'high',
+    status: 'received',
+    citizenEmail: 'vecino.escazu@gmail.com',
+    createdAt: '2026-06-13T11:00:00Z',
+    coordinates: { x: 5, y: 69, lat: 9.9214, lng: -84.1432 },
+    images: [],
+    history: [
+      { date: '2026-06-13T11:00:00Z', status: 'received', note: 'Reporte registrado por ciudadano' }
+    ]
+  },
+  {
+    id: 'rep-11',
+    title: 'Basurero municipal desbordado',
+    description: 'El recolector público de basura lleva días lleno y la gente ha empezado a apilar basura a su alrededor, bloqueando la acera peatonal.',
+    category: 'aseo',
+    location: 'San José, San José, Merced - Frente a la Estación de Ferrocarril al Pacífico',
+    priority: 'low',
+    status: 'resolved',
+    assignedTo: 'campo@municipal.go.cr',
+    citizenEmail: 'peaton.chepe@gmail.com',
+    createdAt: '2026-06-11T15:45:00Z',
+    notes: 'Limpieza y vaciado completado.',
+    coordinates: { x: 49, y: 45, lat: 9.9388, lng: -84.0864 },
+    images: [],
+    resolutionComment: 'Se procedió al vaciado del contenedor y la limpieza del perímetro.',
+    resolutionImages: [],
+    history: [
+      { date: '2026-06-11T15:45:00Z', status: 'received', note: 'Reporte registrado por ciudadano' },
+      { date: '2026-06-11T17:00:00Z', status: 'assigned', note: 'Asignado a Carlos Mendoza' },
+      { date: '2026-06-12T10:00:00Z', status: 'resolved', note: 'Marcado como Resuelto por el operario. Comentario: Se procedió al vaciado del contenedor y la limpieza del perímetro.' }
+    ]
+  },
+  {
+    id: 'rep-12',
+    title: 'Hundimiento severo en la calzada',
+    description: 'Un tramo de asfalto de aproximadamente 2 metros de diámetro se hundió tras las últimas lluvias. El hueco es muy hondo y puede causar accidentes trágicos.',
+    category: 'vias',
+    location: 'Heredia, Barva, Barva Centro - Calle Principal hacia San Pedro de Barva',
+    priority: 'high',
+    status: 'received',
+    citizenEmail: 'barveno.alerta@gmail.com',
+    createdAt: '2026-06-13T05:15:00Z',
+    coordinates: { x: 22, y: 0, lat: 10.0162, lng: -84.1215 },
+    images: [],
+    history: [
+      { date: '2026-06-13T05:15:00Z', status: 'received', note: 'Reporte registrado por ciudadano' }
     ]
   }
 ];
@@ -82,9 +264,42 @@ const INITIAL_REPORTS = [
 export const initStorage = () => {
   if (!localStorage.getItem('rc_users')) {
     localStorage.setItem('rc_users', JSON.stringify(DEFAULT_USERS));
+  } else {
+    // Asegurar que los usuarios por defecto (incluido el nuevo usuario PoC) existan en localStorage
+    try {
+      const users = JSON.parse(localStorage.getItem('rc_users'));
+      let updated = false;
+      DEFAULT_USERS.forEach(defUser => {
+        if (!users.some(u => u.email.toLowerCase() === defUser.email.toLowerCase())) {
+          users.push(defUser);
+          updated = true;
+        }
+      });
+      if (updated) {
+        localStorage.setItem('rc_users', JSON.stringify(users));
+      }
+    } catch (e) {
+      console.error('Error updating default users:', e);
+    }
   }
   if (!localStorage.getItem('rc_reports')) {
     localStorage.setItem('rc_reports', JSON.stringify(INITIAL_REPORTS));
+  } else {
+    try {
+      const reports = JSON.parse(localStorage.getItem('rc_reports')) || [];
+      let updated = false;
+      INITIAL_REPORTS.forEach(defReport => {
+        if (!reports.some(r => r.id === defReport.id)) {
+          reports.push(defReport);
+          updated = true;
+        }
+      });
+      if (updated) {
+        localStorage.setItem('rc_reports', JSON.stringify(reports));
+      }
+    } catch (e) {
+      console.error('Error updating default reports:', e);
+    }
   }
 };
 
@@ -185,6 +400,9 @@ export const updateReportStatus = (reportId, newStatus, note = '') => {
   const reports = getReports();
   const index = reports.findIndex(r => r.id === reportId);
   if (index !== -1) {
+    if (reports[index].status === 'closed' || reports[index].status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
     reports[index].status = newStatus;
     if (note) {
       reports[index].notes = note;
@@ -293,6 +511,9 @@ export const closeReport = (reportId, closureComment, closureImage) => {
   const reports = getReports();
   const index = reports.findIndex(r => r.id === reportId);
   if (index !== -1) {
+    if (reports[index].status === 'closed' || reports[index].status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
     reports[index].status = 'closed';
     reports[index].closureComment = closureComment || '';
     reports[index].closureImage = closureImage || null;
@@ -356,6 +577,9 @@ export const rejectReport = (reportId, rejectReason) => {
   const reports = getReports();
   const index = reports.findIndex(r => r.id === reportId);
   if (index !== -1) {
+    if (reports[index].status === 'closed' || reports[index].status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
     reports[index].status = 'rejected';
     reports[index].rejectReason = rejectReason || '';
     reports[index].history.push({
@@ -381,6 +605,9 @@ export const updateReportStatusByAuthority = (reportId, newStatus, comment = '')
   const reports = getReports();
   const index = reports.findIndex(r => r.id === reportId);
   if (index !== -1) {
+    if (reports[index].status === 'closed' || reports[index].status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
     reports[index].status = newStatus;
     reports[index].history.push({
       date: new Date().toISOString(),
@@ -404,6 +631,41 @@ export const updateReportStatusByAuthority = (reportId, newStatus, comment = '')
   }
   throw new Error('Reporte no encontrado');
 };
+
+// Actualizar la prioridad del reporte por la autoridad municipal
+export const updateReportPriority = (reportId, newPriority) => {
+  const reports = getReports();
+  const index = reports.findIndex(r => r.id === reportId);
+  if (index !== -1) {
+    if (reports[index].status === 'closed' || reports[index].status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
+    const oldPriorityObj = PRIORITIES.find(p => p.value === reports[index].priority);
+    const newPriorityObj = PRIORITIES.find(p => p.value === newPriority);
+    const oldLabel = oldPriorityObj ? oldPriorityObj.label : reports[index].priority;
+    const newLabel = newPriorityObj ? newPriorityObj.label : newPriority;
+    
+    reports[index].priority = newPriority;
+    reports[index].history.push({
+      date: new Date().toISOString(),
+      status: reports[index].status,
+      note: `Prioridad cambiada de "${oldLabel}" a "${newLabel}" por la autoridad municipal`
+    });
+    localStorage.setItem('rc_reports', JSON.stringify(reports));
+    
+    // Notificar al ciudadano
+    createNotification(reportId, reports[index].status, `La urgencia del reporte fue actualizada a: ${newLabel}`);
+    
+    // Si está asignado y se actualiza, notificar al operario
+    if (reports[index].assignedTo) {
+      createNotificationForUser(reports[index].assignedTo, reportId, `La prioridad del reporte asignado "${reports[index].title}" fue cambiada a: ${newLabel}`);
+    }
+    
+    return reports[index];
+  }
+  throw new Error('Reporte no encontrado');
+};
+
 
 // Limpiar alertas de inactividad de un reporte específico
 export const clearInactivityAlerts = (reportId) => {
@@ -452,6 +714,153 @@ export const markAllAuthorityAlertsRead = () => {
   localStorage.setItem('rc_authority_alerts', JSON.stringify(alerts));
 };
 
+// Crear alerta/notificación específica para la autoridad
+export const createAuthorityNotification = (reportId, type, message) => {
+  const reports = getReports();
+  const report = reports.find(r => r.id === reportId);
+  const alerts = JSON.parse(localStorage.getItem('rc_authority_alerts') || '[]');
+  const now = new Date();
+  
+  const categoryObj = CATEGORIES.find(c => c.id === (report ? report.category : ''));
+  const categoryLabel = categoryObj ? categoryObj.label : (report ? report.category : '');
+  const zone = report ? (report.location || 'Zona no especificada') : '';
+
+  const newAlert = {
+    id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    reportId: reportId,
+    reportTitle: report ? report.title : 'Notificación',
+    category: categoryLabel,
+    zone: zone,
+    message: message,
+    type: type, // 'resolved' o 'cannot_resolve'
+    date: now.toISOString(),
+    read: false
+  };
+
+  alerts.unshift(newAlert);
+  localStorage.setItem('rc_authority_alerts', JSON.stringify(alerts));
+};
+
+// Registrar resolución de un problema por el personal de campo (operario)
+export const resolveReportByFieldStaff = (reportId, comment, resolutionImages) => {
+  const reports = getReports();
+  const index = reports.findIndex(r => r.id === reportId);
+  if (index !== -1) {
+    const report = reports[index];
+    if (report.status === 'closed' || report.status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
+    
+    report.status = 'resolved';
+    report.resolutionComment = comment;
+    report.resolutionImages = resolutionImages || [];
+    report.resolutionDate = new Date().toISOString();
+    
+    report.history.push({
+      date: new Date().toISOString(),
+      status: 'resolved',
+      note: `Marcado como Resuelto por el operario. Comentario: ${comment}`,
+      images: resolutionImages || []
+    });
+    
+    localStorage.setItem('rc_reports', JSON.stringify(reports));
+    
+    // Notificar al ciudadano
+    createNotification(reportId, 'resolved', comment);
+    
+    // Notificar a la autoridad
+    createAuthorityNotification(
+      reportId, 
+      'resolved', 
+      `El reporte "${report.title}" fue marcado como Resuelto por el operario. Comentario: "${comment}"`
+    );
+    
+    // Limpiar alertas de inactividad
+    clearInactivityAlerts(reportId);
+    
+    return report;
+  }
+  throw new Error('Reporte no encontrado');
+};
+
+// Registrar imposibilidad de resolución por el personal de campo (operario)
+export const reportImpossibilityByFieldStaff = (reportId, reason) => {
+  const reports = getReports();
+  const index = reports.findIndex(r => r.id === reportId);
+  if (index !== -1) {
+    const report = reports[index];
+    if (report.status === 'closed' || report.status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
+    
+    // El estado del reporte permanece en En gestión (su estado actual)
+    report.history.push({
+      date: new Date().toISOString(),
+      status: report.status,
+      note: `Imposibilidad de resolución reportada. Motivo: ${reason}`
+    });
+    
+    localStorage.setItem('rc_reports', JSON.stringify(reports));
+    
+    // Notificar a la autoridad
+    createAuthorityNotification(
+      reportId, 
+      'cannot_resolve', 
+      `No se pudo resolver el reporte "${report.title}". Motivo: "${reason}"`
+    );
+    
+    // Limpiar alertas de inactividad al haber novedades
+    clearInactivityAlerts(reportId);
+    
+    return report;
+  }
+  throw new Error('Reporte no encontrado');
+};
+
+// Devolver reporte al personal de campo por parte de la autoridad
+export const returnReportToFieldStaff = (reportId, returnReason) => {
+  const reports = getReports();
+  const index = reports.findIndex(r => r.id === reportId);
+  if (index !== -1) {
+    const report = reports[index];
+    if (report.status === 'closed' || report.status === 'rejected') {
+      throw new Error('Un reporte cerrado o rechazado no puede ser modificado.');
+    }
+    
+    report.status = 'assigned'; // Vuelve a asignado (En gestión)
+    
+    report.history.push({
+      date: new Date().toISOString(),
+      status: 'assigned',
+      note: `Devuelto al personal de campo. Motivo de devolución: ${returnReason}`
+    });
+    
+    localStorage.setItem('rc_reports', JSON.stringify(reports));
+    
+    // Notificar al operario asignado
+    if (report.assignedTo) {
+      createNotificationForUser(
+        report.assignedTo, 
+        reportId, 
+        `El reporte "${report.title}" fue devuelto para revisión. Motivo: ${returnReason}`
+      );
+    }
+    
+    // Notificar al ciudadano
+    createNotification(
+      reportId, 
+      'assigned', 
+      `El reporte vuelve a estar en gestión para corregir observaciones. Motivo: ${returnReason}`
+    );
+    
+    // Limpiar alertas de inactividad
+    clearInactivityAlerts(reportId);
+    
+    return report;
+  }
+  throw new Error('Reporte no encontrado');
+};
+
 // Verificar e inyectar alertas automáticas de inactividad
 export const checkAndGenerateInactivityAlerts = () => {
   const reports = getReports();
@@ -497,6 +906,7 @@ export const checkAndGenerateInactivityAlerts = () => {
           zone: zone,
           daysElapsed: diffDays,
           date: now.toISOString(),
+          type: 'inactivity',
           read: false
         };
 
@@ -510,3 +920,4 @@ export const checkAndGenerateInactivityAlerts = () => {
     localStorage.setItem('rc_authority_alerts', JSON.stringify(updatedAlerts));
   }
 };
+
